@@ -8,6 +8,8 @@ export const env = createEnv({
     BETTER_AUTH_SECRET: z.string().min(1),
     GITHUB_CLIENT_ID: z.string().min(1),
     GITHUB_CLIENT_SECRET: z.string().min(1),
+    POLAR_ACCESS_TOKEN: z.string().min(1),
+    POLAR_SUCCESS_URL: z.string().min(1),
   },
   client: {},
   shared: {},

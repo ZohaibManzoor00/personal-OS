@@ -16,35 +16,12 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { authClient } from "@/lib/auth-client";
-// import { useHasActiveSubscription } from "@/features/subscriptions/hooks/use-subscription";
-
-const menuItems = [
-  {
-    title: "Main",
-    items: [
-      {
-        title: "Workflows",
-        icon: FolderOpenIcon,
-        url: "/workflows",
-      },
-      {
-        title: "Credentials",
-        icon: KeyIcon,
-        url: "/credentials",
-      },
-      {
-        title: "Executions",
-        icon: HistoryIcon,
-        url: "/executions",
-      },
-    ],
-  },
-];
+import { useHasActiveSubscription } from "@/features/subscriptions/hooks/use-subscription";
 
 export const AppSidebar = () => {
   const router = useRouter();
   const pathname = usePathname();
-  //   const { hasActiveSubscription, isLoading } = useHasActiveSubscription();
+  const { hasActiveSubscription, isLoading } = useHasActiveSubscription();
 
   return (
     <Sidebar collapsible="icon">
@@ -52,8 +29,8 @@ export const AppSidebar = () => {
         <SidebarMenuItem>
           <SidebarMenuButton asChild className="gap-x-4 h-10 px-4">
             <Link href="/" prefetch>
-              <Image src="/logos/logo.svg" alt="Nodebase" width={30} height={30} />
-              <span className="font-semibold text-sm">Nodebase</span>
+              <Image src="/logos/logo.svg" alt="Zeno" width={30} height={30} />
+              <span className="font-semibold text-sm">Zeno</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -85,18 +62,16 @@ export const AppSidebar = () => {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
-          {/* {!hasActiveSubscription && !isLoading && ( */}
+          {!hasActiveSubscription && !isLoading && (
             <SidebarMenuItem>
-              {/* <SidebarMenuButton tooltip="Upgade to Pro" className="gap-x-4 h-10 px-4" onClick={() => authClient.checkout({ slug: "pro" })}> */}
-              <SidebarMenuButton tooltip="Upgade to Pro" className="gap-x-4 h-10 px-4">
+              <SidebarMenuButton tooltip="Upgade to Pro" className="gap-x-4 h-10 px-4" onClick={() => authClient.checkout({ slug: "pro" })}>
                 <StarIcon className="h-4 w-4" />
                 <span>Upgrade to Pro</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
-          {/* )} */}
+          )}
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Billing Portal" className="gap-x-4 h-10 px-4" onClick={() => {console.log("Billing Portal")}}>
-            {/* <SidebarMenuButton tooltip="Billing Portal" className="gap-x-4 h-10 px-4" onClick={() => authClient.customer.portal()}> */}
+            <SidebarMenuButton tooltip="Billing Portal" className="gap-x-4 h-10 px-4" onClick={() => authClient.customer.portal()}>
               <CreditCardIcon className="h-4 w-4" />
               <span>Billing Portal</span>
             </SidebarMenuButton>
@@ -124,3 +99,26 @@ export const AppSidebar = () => {
     </Sidebar>
   );
 };
+
+const menuItems = [
+  {
+    title: "Main",
+    items: [
+      {
+        title: "Workflows",
+        icon: FolderOpenIcon,
+        url: "/workflows",
+      },
+      {
+        title: "Credentials",
+        icon: KeyIcon,
+        url: "/credentials",
+      },
+      {
+        title: "Executions",
+        icon: HistoryIcon,
+        url: "/executions",
+      },
+    ],
+  },
+];
