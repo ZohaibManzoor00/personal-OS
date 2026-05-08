@@ -12,6 +12,9 @@
     "check": "biome check . --write"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.76",
+    "@ai-sdk/google": "^3.0.70",
+    "@ai-sdk/openai": "^3.0.63",
     "@base-ui/react": "^1.4.1",
     "@hookform/resolvers": "^5.2.2",
     "@neondatabase/serverless": "^1.1.0",
@@ -24,6 +27,7 @@
     "@trpc/client": "^11.17.0",
     "@trpc/server": "^11.17.0",
     "@trpc/tanstack-react-query": "^11.17.0",
+    "ai": "^6.0.176",
     "better-auth": "^1.6.9",
     "class-variance-authority": "^0.7.1",
     "client-only": "^0.0.1",

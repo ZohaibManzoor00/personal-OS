@@ -1,13 +1,13 @@
+import { generateText } from "ai";
 import { inngest } from "./client";
+import { openai } from "@ai-sdk/openai";
 
-export const processTask = inngest.createFunction(
-  { id: "process-task", triggers: { event: "app/task.created" } },
-  async ({ event, step }) => {
-    const result = await step.run("handle-task", async () => {
-      return { processed: true, id: event.data.id };
-    });
-    console.log("RUNNING BG JOB")
-    await step.sleep("pause", "1s");
-    return { message: `Task ${event.data.id} complete`, result };
-  },
-);
+export const execute = inngest.createFunction({ id: "execute-ai", triggers: { event: "execute/ai" } }, async ({ event, step }) => {
+  console.log("Executing AI...");
+  const { steps } = await step.ai.wrap("openai generate text", generateText, {
+    model: openai("gpt-4o"),
+    prompt: "what is 2 * 2?",
+  });
+  console.log("AI response:", steps[0].text);
+  return steps;
+});

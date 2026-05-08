@@ -20,6 +20,10 @@ export const appRouter = createTRPCRouter({
 
     return { message: "Workflow created" };
   }),
+  testAI: protectedProcedure.mutation(async () => {
+    await inngest.send({ name: "execute/ai" });
+    return { message: "AI test sent" };
+  }),
 });
 
 export type AppRouter = typeof appRouter;
