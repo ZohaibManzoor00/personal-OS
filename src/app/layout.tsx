@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { TRPCReactProvider } from "@/trpc/client";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
 
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
@@ -22,7 +23,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <TRPCReactProvider>
       <html lang="en" className={cn("h-full", "antialiased", geistSans.variable, geistMono.variable, "font-sans", inter.variable)}>
         <body className="min-h-full flex flex-col">
-          <TooltipProvider>{children}</TooltipProvider>
+          <NuqsAdapter>
+            <TooltipProvider>{children}</TooltipProvider>
+          </NuqsAdapter>
           <Toaster />
         </body>
       </html>
