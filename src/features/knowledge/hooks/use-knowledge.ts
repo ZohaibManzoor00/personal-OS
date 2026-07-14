@@ -6,9 +6,25 @@ import {
 } from "@tanstack/react-query";
 import { useQueryStates } from "nuqs";
 import { parseAsString } from "nuqs/server";
+import { useState } from "react";
 import { toast } from "sonner";
-import type { Node as KnowledgeNode } from "@/generated/prisma/client";
 import { useTRPC } from "@/trpc/client";
+import type { KnowledgeNode } from "../types";
+
+const readImageDimensions = (file: File) =>
+  new Promise<{ width: number; height: number } | undefined>((resolve) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      resolve({ width: image.naturalWidth, height: image.naturalHeight });
+      URL.revokeObjectURL(url);
+    };
+    image.onerror = () => {
+      resolve(undefined);
+      URL.revokeObjectURL(url);
+    };
+    image.src = url;
+  });
 
 export const knowledgeParams = {
   search: parseAsString.withDefault("").withOptions({ clearOnDefault: true }),
@@ -175,6 +191,75 @@ export const useDeleteNode = () => {
       },
     }),
   );
+};
+
+export const useNodeImage = (nodeId: string) => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  const createUploadUrl = useMutation(
+    trpc.knowledge.createImageUploadUrl.mutationOptions(),
+  );
+  const attachImage = useMutation(trpc.knowledge.attachImage.mutationOptions());
+  const removeImage = useMutation(
+    trpc.knowledge.removeImage.mutationOptions({
+      onSuccess: () => toast.success("Image removed"),
+      onError: (error) =>
+        toast.error(`Failed to remove image: ${error.message}`),
+    }),
+  );
+
+  const [isUploading, setIsUploading] = useState(false);
+
+  const invalidate = () => {
+    queryClient.invalidateQueries(trpc.knowledge.listChildren.queryFilter());
+    queryClient.invalidateQueries(
+      trpc.knowledge.get.queryFilter({ id: nodeId }),
+    );
+    queryClient.invalidateQueries(trpc.knowledge.search.queryFilter());
+  };
+
+  const upload = async (file: File) => {
+    setIsUploading(true);
+    try {
+      const { uploadUrl, key } = await createUploadUrl.mutateAsync({
+        nodeId,
+        contentType: file.type,
+      });
+
+      const response = await fetch(uploadUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      if (!response.ok) throw new Error("Upload failed");
+
+      const dimensions = await readImageDimensions(file);
+      await attachImage.mutateAsync({
+        nodeId,
+        storageKey: key,
+        filename: file.name,
+        width: dimensions?.width,
+        height: dimensions?.height,
+      });
+
+      invalidate();
+      toast.success("Image updated");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to upload image",
+      );
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const remove = async () => {
+    await removeImage.mutateAsync({ nodeId });
+    invalidate();
+  };
+
+  return { upload, remove, isUploading, isRemoving: removeImage.isPending };
 };
 
 export const useMoveNode = () => {

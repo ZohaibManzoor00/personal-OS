@@ -2,6 +2,7 @@
 
 import {
   CornerUpRightIcon,
+  ImageIcon,
   MoreHorizontalIcon,
   PencilIcon,
   TrashIcon,
@@ -15,9 +16,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { Node as KnowledgeNode } from "@/generated/prisma/client";
 import { cn } from "@/lib/utils";
+import type { KnowledgeNode } from "../types";
 import { KnowledgeDeleteDialog } from "./knowledge-delete-dialog";
+import { KnowledgeImageDialog } from "./knowledge-image-dialog";
 import { KnowledgeMoveDialog } from "./knowledge-move-dialog";
 import { KnowledgeNodeDialog } from "./knowledge-node-dialog";
 
@@ -30,6 +32,7 @@ type Props = {
 export const KnowledgeNodeMenu = ({ node, onDeleted, className }: Props) => {
   const [renameOpen, setRenameOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
+  const [imageOpen, setImageOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   return (
@@ -58,6 +61,10 @@ export const KnowledgeNodeMenu = ({ node, onDeleted, className }: Props) => {
             <CornerUpRightIcon className="size-4" />
             Move to
           </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setImageOpen(true)}>
+            <ImageIcon className="size-4" />
+            {node.images.length > 0 ? "Change image" : "Add image"}
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"
@@ -79,6 +86,11 @@ export const KnowledgeNodeMenu = ({ node, onDeleted, className }: Props) => {
         node={node}
         open={moveOpen}
         onOpenChange={setMoveOpen}
+      />
+      <KnowledgeImageDialog
+        node={node}
+        open={imageOpen}
+        onOpenChange={setImageOpen}
       />
       <KnowledgeDeleteDialog
         node={node}

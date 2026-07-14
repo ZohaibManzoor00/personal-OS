@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { Suspense, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorView, LoadingView } from "@/components/entity-component";
-import type { Node as KnowledgeNode } from "@/generated/prisma/client";
 import { useKnowledgeNode, useListChildren } from "../hooks/use-knowledge";
 import { KnowledgeBreadcrumb } from "./knowledge-breadcrumb";
 import { KnowledgeEmptyState } from "./knowledge-empty-state";
@@ -43,12 +42,7 @@ export const KnowledgeSpaceView = ({ nodeId }: { nodeId: string }) => {
       <KnowledgeHeader
         title={node.title}
         {...handlers}
-        actions={
-          <KnowledgeNodeMenu
-            node={node as KnowledgeNode}
-            onDeleted={goToParent}
-          />
-        }
+        actions={<KnowledgeNodeMenu node={node} onDeleted={goToParent} />}
       />
 
       <ErrorBoundary

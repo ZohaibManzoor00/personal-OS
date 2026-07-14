@@ -1,4 +1,4 @@
-import type { Node as KnowledgeNode } from "@/generated/prisma/client";
+import type { KnowledgeNode } from "../types";
 import { KnowledgeCard } from "./knowledge-card";
 
 export const KnowledgeGrid = ({ items }: { items: KnowledgeNode[] }) => {

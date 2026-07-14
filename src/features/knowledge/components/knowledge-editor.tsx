@@ -4,7 +4,6 @@ import { formatDistanceToNow } from "date-fns";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import type { Node as KnowledgeNode } from "@/generated/prisma/client";
 import { useKnowledgeNode, useUpdateNode } from "../hooks/use-knowledge";
 import { KnowledgeNodeMenu } from "./knowledge-node-menu";
 
@@ -55,7 +54,7 @@ export const KnowledgeEditor = ({
             {formatDistanceToNow(node.updatedAt, { addSuffix: true })}
           </p>
         </div>
-        <KnowledgeNodeMenu node={node as KnowledgeNode} onDeleted={onDeleted} />
+        <KnowledgeNodeMenu node={node} onDeleted={onDeleted} />
       </div>
 
       <Textarea

@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import z from "zod";
 import { prisma } from "@/lib/db";
+import { deleteObject, getPresignedUploadUrl, getPublicUrl } from "@/lib/r2";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { slugify } from "../lib/slug";
 
@@ -8,7 +9,23 @@ const SEARCH_LIMIT = 20;
 
 const nodeType = z.enum(["SPACE", "PAGE"]);
 
-// Slugs are unique per (userId, parentId). Append a numeric suffix on collision.
+const coverInclude = {
+  images: { orderBy: { createdAt: "desc" }, take: 1 },
+} as const;
+
+const IMAGE_EXTENSIONS: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/avif": "avif",
+};
+
+const buildImageKey = ({ userId, nodeId, contentType }: { userId: string; nodeId: string; contentType: string }) => {
+  const ext = IMAGE_EXTENSIONS[contentType] ?? "bin";
+  return `nodes/${userId}/${nodeId}/${crypto.randomUUID()}.${ext}`;
+};
+
 const uniqueSlug = async ({
   userId,
   parentId,
@@ -41,26 +58,24 @@ const uniqueSlug = async ({
 };
 
 export const knowledgeRouter = createTRPCRouter({
-  listChildren: protectedProcedure
-    .input(z.object({ parentId: z.string().nullable() }))
-    .query(async ({ ctx, input }) => {
-      return await prisma.node.findMany({
-        where: {
-          userId: ctx.auth.user.id,
-          parentId: input.parentId,
-          archivedAt: null,
-        },
-        orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
-      });
-    }),
+  listChildren: protectedProcedure.input(z.object({ parentId: z.string().nullable() })).query(async ({ ctx, input }) => {
+    return await prisma.node.findMany({
+      where: {
+        userId: ctx.auth.user.id,
+        parentId: input.parentId,
+        archivedAt: null,
+      },
+      orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
+      include: coverInclude,
+    });
+  }),
 
-  get: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .query(async ({ ctx, input }) => {
-      return await prisma.node.findFirstOrThrow({
-        where: { id: input.id, userId: ctx.auth.user.id },
-      });
-    }),
+  get: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
+    return await prisma.node.findFirstOrThrow({
+      where: { id: input.id, userId: ctx.auth.user.id },
+      include: coverInclude,
+    });
+  }),
 
   listSpaces: protectedProcedure.query(async ({ ctx }) => {
     return await prisma.node.findMany({
@@ -69,30 +84,28 @@ export const knowledgeRouter = createTRPCRouter({
     });
   }),
 
-  getAncestors: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .query(async ({ ctx, input }) => {
-      const userId = ctx.auth.user.id;
+  getAncestors: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
+    const userId = ctx.auth.user.id;
 
-      const node = await prisma.node.findFirst({
-        where: { id: input.id, userId },
+    const node = await prisma.node.findFirst({
+      where: { id: input.id, userId },
+    });
+    if (!node) throw new TRPCError({ code: "NOT_FOUND" });
+
+    const ancestors = [node];
+    let parentId = node.parentId;
+
+    while (parentId) {
+      const parent = await prisma.node.findFirst({
+        where: { id: parentId, userId },
       });
-      if (!node) throw new TRPCError({ code: "NOT_FOUND" });
+      if (!parent) break;
+      ancestors.unshift(parent);
+      parentId = parent.parentId;
+    }
 
-      const ancestors = [node];
-      let parentId = node.parentId;
-
-      while (parentId) {
-        const parent = await prisma.node.findFirst({
-          where: { id: parentId, userId },
-        });
-        if (!parent) break;
-        ancestors.unshift(parent);
-        parentId = parent.parentId;
-      }
-
-      return ancestors;
-    }),
+    return ancestors;
+  }),
 
   create: protectedProcedure
     .input(
@@ -173,93 +186,197 @@ export const knowledgeRouter = createTRPCRouter({
       });
     }),
 
-  delete: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const userId = ctx.auth.user.id;
+  delete: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
+    const userId = ctx.auth.user.id;
 
-      const node = await prisma.node.findFirst({
-        where: { id: input.id, userId },
+    const node = await prisma.node.findFirst({
+      where: { id: input.id, userId },
+    });
+    if (!node) throw new TRPCError({ code: "NOT_FOUND" });
+
+    await prisma.node.delete({ where: { id: input.id } });
+
+    return node;
+  }),
+
+  move: protectedProcedure.input(z.object({ id: z.string(), parentId: z.string().nullable() })).mutation(async ({ ctx, input }) => {
+    const userId = ctx.auth.user.id;
+
+    if (input.parentId === input.id)
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "A node cannot contain itself",
       });
-      if (!node) throw new TRPCError({ code: "NOT_FOUND" });
 
-      await prisma.node.delete({ where: { id: input.id } });
+    const node = await prisma.node.findFirstOrThrow({
+      where: { id: input.id, userId },
+    });
 
-      return node;
-    }),
-
-  move: protectedProcedure
-    .input(z.object({ id: z.string(), parentId: z.string().nullable() }))
-    .mutation(async ({ ctx, input }) => {
-      const userId = ctx.auth.user.id;
-
-      if (input.parentId === input.id)
+    if (input.parentId) {
+      const target = await prisma.node.findFirst({
+        where: { id: input.parentId, userId },
+      });
+      if (!target)
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Destination not found",
+        });
+      if (target.type !== "SPACE")
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "A node cannot contain itself",
+          message: "You can only move nodes into a space",
         });
 
-      const node = await prisma.node.findFirstOrThrow({
-        where: { id: input.id, userId },
-      });
-
-      if (input.parentId) {
-        const target = await prisma.node.findFirst({
-          where: { id: input.parentId, userId },
-        });
-        if (!target)
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Destination not found",
-          });
-        if (target.type !== "SPACE")
+      let parentId = target.parentId;
+      while (parentId) {
+        if (parentId === input.id)
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "You can only move nodes into a space",
+            message: "You cannot move a space into its own descendant",
           });
+        const parent = await prisma.node.findFirst({
+          where: { id: parentId, userId },
+        });
+        if (!parent) break;
+        parentId = parent.parentId;
+      }
+    }
 
-        let parentId = target.parentId;
-        while (parentId) {
-          if (parentId === input.id)
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "You cannot move a space into its own descendant",
-            });
-          const parent = await prisma.node.findFirst({
-            where: { id: parentId, userId },
-          });
-          if (!parent) break;
-          parentId = parent.parentId;
-        }
+    const slug = await uniqueSlug({
+      userId,
+      parentId: input.parentId,
+      title: node.title,
+      excludeId: node.id,
+    });
+
+    return await prisma.node.update({
+      where: { id: input.id },
+      data: { parentId: input.parentId, slug },
+    });
+  }),
+
+  search: protectedProcedure.input(z.object({ query: z.string() })).query(async ({ ctx, input }) => {
+    const query = input.query.trim();
+    if (!query) return [];
+
+    return await prisma.node.findMany({
+      where: {
+        userId: ctx.auth.user.id,
+        title: { contains: query, mode: "insensitive" },
+        archivedAt: null,
+      },
+      orderBy: { updatedAt: "desc" },
+      take: SEARCH_LIMIT,
+      include: coverInclude,
+    });
+  }),
+
+  createImageUploadUrl: protectedProcedure
+    .input(z.object({ nodeId: z.string(), contentType: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.auth.user.id;
+
+      if (!(input.contentType in IMAGE_EXTENSIONS)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Unsupported image type",
+        });
       }
 
-      const slug = await uniqueSlug({
+      await prisma.node.findFirstOrThrow({
+        where: { id: input.nodeId, userId },
+        select: { id: true },
+      });
+
+      const key = buildImageKey({
         userId,
-        parentId: input.parentId,
-        title: node.title,
-        excludeId: node.id,
+        nodeId: input.nodeId,
+        contentType: input.contentType,
       });
+      let uploadUrl = null;
+      try {
+        uploadUrl = (await getPresignedUploadUrl({
+          key,
+          contentType: input.contentType,
+        })) as string;
+      } catch (error) {
+        console.error(error);
+        uploadUrl = null;
+      }
 
-      return await prisma.node.update({
-        where: { id: input.id },
-        data: { parentId: input.parentId, slug },
-      });
+      return { uploadUrl, key, publicUrl: getPublicUrl(key) };
     }),
 
-  search: protectedProcedure
-    .input(z.object({ query: z.string() }))
-    .query(async ({ ctx, input }) => {
-      const query = input.query.trim();
-      if (!query) return [];
+  attachImage: protectedProcedure
+    .input(
+      z.object({
+        nodeId: z.string(),
+        storageKey: z.string(),
+        filename: z.string().optional(),
+        width: z.number().int().positive().optional(),
+        height: z.number().int().positive().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.auth.user.id;
 
-      return await prisma.node.findMany({
-        where: {
-          userId: ctx.auth.user.id,
-          title: { contains: query, mode: "insensitive" },
-          archivedAt: null,
+      await prisma.node.findFirstOrThrow({
+        where: { id: input.nodeId, userId },
+        select: { id: true },
+      });
+
+      if (!input.storageKey.startsWith(`nodes/${userId}/${input.nodeId}/`)) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Invalid storage key",
+        });
+      }
+
+      // One cover per node: remove any previous images (rows + objects) first.
+      const existing = await prisma.nodeImage.findMany({
+        where: { nodeId: input.nodeId },
+      });
+      await Promise.all(existing.map((image) => deleteObject(image.storageKey).catch(() => undefined)));
+      if (existing.length > 0) await prisma.nodeImage.deleteMany({ where: { nodeId: input.nodeId } });
+
+      const image = await prisma.nodeImage.create({
+        data: {
+          nodeId: input.nodeId,
+          url: getPublicUrl(input.storageKey),
+          storageKey: input.storageKey,
+          filename: input.filename,
+          width: input.width,
+          height: input.height,
         },
-        orderBy: { updatedAt: "desc" },
-        take: SEARCH_LIMIT,
       });
+
+      await prisma.node.update({
+        where: { id: input.nodeId },
+        data: { updatedAt: new Date() },
+      });
+
+      return image;
     }),
+
+  removeImage: protectedProcedure.input(z.object({ nodeId: z.string() })).mutation(async ({ ctx, input }) => {
+    const userId = ctx.auth.user.id;
+
+    await prisma.node.findFirstOrThrow({
+      where: { id: input.nodeId, userId },
+      select: { id: true },
+    });
+
+    const existing = await prisma.nodeImage.findMany({
+      where: { nodeId: input.nodeId },
+    });
+    await Promise.all(existing.map((image) => deleteObject(image.storageKey).catch(() => undefined)));
+    await prisma.nodeImage.deleteMany({ where: { nodeId: input.nodeId } });
+
+    await prisma.node.update({
+      where: { id: input.nodeId },
+      data: { updatedAt: new Date() },
+    });
+
+    return { nodeId: input.nodeId };
+  }),
 });
