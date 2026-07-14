@@ -15,7 +15,7 @@ export const KnowledgeCard = ({ node }: { node: KnowledgeNode }) => {
   return (
     <Card
       size="sm"
-      className="group/card relative h-full justify-between gap-4 p-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+      className="group/card relative h-full gap-0 p-0 py-0! transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
     >
       <Link
         href={`/knowledge/${node.id}`}
@@ -24,30 +24,30 @@ export const KnowledgeCard = ({ node }: { node: KnowledgeNode }) => {
         className="absolute inset-0 rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
 
-      <div className="flex items-start justify-between gap-2">
+      <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden border-b bg-muted">
         {cover ? (
           // biome-ignore lint/performance/noImgElement: R2 public asset, no next/image domain config
           <img
             src={cover.url}
             alt={cover.altText ?? node.title}
-            className="size-9 rounded-lg object-cover ring-1 ring-border"
+            className="size-full object-contain"
           />
         ) : (
-          <div className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover/card:text-foreground">
-            <Icon className="size-4.5" />
-          </div>
+          <Icon className="size-8 text-muted-foreground transition-colors group-hover/card:text-foreground" />
         )}
-        <KnowledgeNodeMenu
-          node={node}
-          className="relative z-10 -mt-1 -mr-1 opacity-0 transition-opacity group-hover/card:opacity-100 focus-visible:opacity-100"
-        />
       </div>
-      <div className="flex flex-col gap-1">
-        <p className="font-heading text-sm font-medium leading-snug">
+
+      <KnowledgeNodeMenu
+        node={node}
+        className="absolute top-1.5 right-1.5 z-10 rounded-md bg-background/70 opacity-0 backdrop-blur-sm transition-opacity group-hover/card:opacity-100 focus-visible:opacity-100"
+      />
+
+      <div className="flex flex-col gap-0.5 px-3 py-2.5">
+        <p className="truncate font-heading text-sm font-medium leading-snug">
           {node.title}
         </p>
-        <p className="text-xs text-muted-foreground">
-          {isSpace ? "Space" : "Page"} &middot; Updated{" "}
+        <p className="truncate text-xs text-muted-foreground">
+          {isSpace ? "Space" : "Page"} &middot;{" "}
           {formatDistanceToNow(node.updatedAt, { addSuffix: true })}
         </p>
       </div>

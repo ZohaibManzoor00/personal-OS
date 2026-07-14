@@ -75,9 +75,6 @@ export const useCreateNode = () => {
   return useMutation(
     trpc.knowledge.create.mutationOptions({
       onSuccess: (data) => {
-        toast.success(
-          `${data.type === "SPACE" ? "Space" : "Page"} "${data.title}" created`,
-        );
         queryClient.invalidateQueries(
           trpc.knowledge.listChildren.queryFilter({ parentId: data.parentId }),
         );
@@ -120,9 +117,6 @@ export const useUpdateNode = () => {
           );
         }
         toast.error(`Failed to save: ${error.message}`);
-      },
-      onSuccess: (_data, variables) => {
-        if (variables.title !== undefined) toast.success("Renamed");
       },
       onSettled: (data) => {
         if (!data) return;
@@ -176,9 +170,6 @@ export const useDeleteNode = () => {
         });
         toast.error(`Failed to delete: ${error.message}`);
       },
-      onSuccess: () => {
-        toast.success("Deleted");
-      },
       onSettled: (data) => {
         queryClient.invalidateQueries(
           trpc.knowledge.listChildren.queryFilter(),
@@ -203,7 +194,6 @@ export const useNodeImage = (nodeId: string) => {
   const attachImage = useMutation(trpc.knowledge.attachImage.mutationOptions());
   const removeImage = useMutation(
     trpc.knowledge.removeImage.mutationOptions({
-      onSuccess: () => toast.success("Image removed"),
       onError: (error) =>
         toast.error(`Failed to remove image: ${error.message}`),
     }),
@@ -219,13 +209,14 @@ export const useNodeImage = (nodeId: string) => {
     queryClient.invalidateQueries(trpc.knowledge.search.queryFilter());
   };
 
-  const upload = async (file: File) => {
+  const upload = async (file: File): Promise<boolean> => {
     setIsUploading(true);
     try {
       const { uploadUrl, key } = await createUploadUrl.mutateAsync({
         nodeId,
         contentType: file.type,
       });
+      if (!uploadUrl) throw new Error("Could not create upload URL");
 
       const response = await fetch(uploadUrl, {
         method: "PUT",
@@ -244,11 +235,12 @@ export const useNodeImage = (nodeId: string) => {
       });
 
       invalidate();
-      toast.success("Image updated");
+      return true;
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to upload image",
       );
+      return false;
     } finally {
       setIsUploading(false);
     }
@@ -269,7 +261,6 @@ export const useMoveNode = () => {
   return useMutation(
     trpc.knowledge.move.mutationOptions({
       onSuccess: (data) => {
-        toast.success(`Moved "${data.title}"`);
         queryClient.invalidateQueries(
           trpc.knowledge.listChildren.queryFilter(),
         );

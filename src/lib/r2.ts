@@ -1,10 +1,6 @@
 import "server-only";
 
-import {
-  DeleteObjectCommand,
-  PutObjectCommand,
-  S3Client,
-} from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { FIVE_MINUTES_IN_SECONDS } from "@/utils/constants";
 import { env } from "./env";
@@ -20,14 +16,7 @@ const r2 = new S3Client({
   },
 });
 
-export const getPresignedUploadUrl = ({
-  key,
-  contentType,
-}: {
-  key: string;
-  contentType: string;
-}): Promise<string> => {
-  console.log("getPresignedUploadUrl", key, contentType, r2);
+export const getPresignedUploadUrl = ({ key, contentType }: { key: string; contentType: string }): Promise<string> => {
   const command = new PutObjectCommand({
     Bucket: BUCKET,
     Key: key,
