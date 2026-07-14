@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Toggle } from "@/components/ui/toggle";
-import { useKnowledgeNode, usePolishMarkdown, useUpdateNode } from "../hooks/use-knowledge";
+import { useKnowledgeNode, usePolishMarkdown, usePreviewHotkeys, useUpdateNode } from "../hooks/use-knowledge";
 import { useVimMode } from "../hooks/use-vim-mode";
 import { KnowledgeImageInsertDialog } from "./knowledge-image-insert-dialog";
 import { KnowledgeMarkdown } from "./knowledge-markdown";
@@ -113,11 +113,13 @@ export const KnowledgeEditor = ({
     polishMarkdown.mutate({ text: content }, { onSuccess: (result) => setContent(result.markdown) });
   };
 
-  const enterEdit = () => setIsEditing(true);
+  const enterEdit = useCallback(() => setIsEditing(true), []);
   const exitEdit = () => {
     handleSave();
     setIsEditing(false);
   };
+
+  usePreviewHotkeys({ enabled: !isEditing, onEdit: enterEdit });
 
   const status = updateNode.isPending ? "Saving…" : isDirty ? "Unsaved changes" : "Saved";
 

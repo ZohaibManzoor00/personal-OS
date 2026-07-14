@@ -1,19 +1,7 @@
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-  useSuspenseQuery,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useQueryStates } from "nuqs";
 import { parseAsString } from "nuqs/server";
-import {
-  type RefObject,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { type RefObject, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
 import type { KnowledgeNode } from "../types";
@@ -43,9 +31,7 @@ export const useKnowledgeParams = () => {
 
 export const useListChildren = (parentId: string | null) => {
   const trpc = useTRPC();
-  return useSuspenseQuery(
-    trpc.knowledge.listChildren.queryOptions({ parentId }),
-  );
+  return useSuspenseQuery(trpc.knowledge.listChildren.queryOptions({ parentId }));
 };
 
 export const useKnowledgeTree = (enabled = true) => {
@@ -108,9 +94,7 @@ export const useScrolledPast = () => {
 
     observerRef.current = new IntersectionObserver(
       ([entry]) => {
-        setScrolledPast(
-          !entry.isIntersecting && entry.boundingClientRect.top < 0,
-        );
+        setScrolledPast(!entry.isIntersecting && entry.boundingClientRect.top < 0);
       },
       { threshold: 0 },
     );
@@ -171,9 +155,7 @@ export const useAncestors = (id: string) => {
 
 export const useSpaces = (enabled = true) => {
   const trpc = useTRPC();
-  return useQuery(
-    trpc.knowledge.listSpaces.queryOptions(undefined, { enabled }),
-  );
+  return useQuery(trpc.knowledge.listSpaces.queryOptions(undefined, { enabled }));
 };
 
 export const useRecentNodes = () => {
@@ -206,9 +188,7 @@ export const useRecordView = (id: string) => {
  * (e.g. the inline and sticky-header page search), only the one currently
  * on-screen responds, so the shortcut always lands on the visible field.
  */
-export const useSearchFocusHotkey = (
-  ref: RefObject<HTMLInputElement | null>,
-) => {
+export const useSearchFocusHotkey = (ref: RefObject<HTMLInputElement | null>) => {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey)) return;
@@ -221,11 +201,7 @@ export const useSearchFocusHotkey = (
       // Ignore instances that are scrolled out of view or otherwise hidden, so
       // duplicate mounts don't steal focus to an off-screen field.
       const rect = input.getBoundingClientRect();
-      const onScreen =
-        rect.width > 0 &&
-        rect.height > 0 &&
-        rect.bottom > 8 &&
-        rect.top < window.innerHeight;
+      const onScreen = rect.width > 0 && rect.height > 0 && rect.bottom > 8 && rect.top < window.innerHeight;
       if (!onScreen) return;
 
       event.preventDefault();
@@ -238,14 +214,53 @@ export const useSearchFocusHotkey = (
   }, [ref]);
 };
 
+/**
+ * Reading-mode ("preview") hotkeys for a knowledge page: `e` enters edit mode
+ * and `j` / `k` scroll the page down / up (Vim-style). Only bound while
+ * `enabled` (i.e. not already editing) and ignores keystrokes typed into inputs
+ * or the editor so it never fights with the search box or Markdown editor.
+ */
+export const usePreviewHotkeys = ({ enabled, onEdit }: { enabled: boolean; onEdit: () => void }) => {
+  useEffect(() => {
+    if (!enabled) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.isContentEditable || target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT")
+      ) {
+        return;
+      }
+
+      const step = window.innerHeight * 0.2;
+
+      switch (event.key) {
+        case "e":
+          event.preventDefault();
+          onEdit();
+          break;
+        case "j":
+          event.preventDefault();
+          window.scrollBy({ top: step, behavior: "smooth" });
+          break;
+        case "k":
+          event.preventDefault();
+          window.scrollBy({ top: -step, behavior: "smooth" });
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [enabled, onEdit]);
+};
+
 export const useKnowledgeSearch = (query: string) => {
   const trpc = useTRPC();
-  return useQuery(
-    trpc.knowledge.search.queryOptions(
-      { query },
-      { enabled: query.trim().length > 0 },
-    ),
-  );
+  return useQuery(trpc.knowledge.search.queryOptions({ query }, { enabled: query.trim().length > 0 }));
 };
 
 export const useCreateNode = () => {
@@ -255,9 +270,7 @@ export const useCreateNode = () => {
   return useMutation(
     trpc.knowledge.create.mutationOptions({
       onSuccess: (data) => {
-        queryClient.invalidateQueries(
-          trpc.knowledge.listChildren.queryFilter({ parentId: data.parentId }),
-        );
+        queryClient.invalidateQueries(trpc.knowledge.listChildren.queryFilter({ parentId: data.parentId }));
         queryClient.invalidateQueries(trpc.knowledge.listSpaces.queryFilter());
         queryClient.invalidateQueries(trpc.knowledge.listTree.queryFilter());
       },
@@ -292,24 +305,15 @@ export const useUpdateNode = () => {
       },
       onError: (error, variables, context) => {
         if (context?.previous) {
-          queryClient.setQueryData(
-            trpc.knowledge.get.queryKey({ id: variables.id }),
-            context.previous,
-          );
+          queryClient.setQueryData(trpc.knowledge.get.queryKey({ id: variables.id }), context.previous);
         }
         toast.error(`Failed to save: ${error.message}`);
       },
       onSettled: (data) => {
         if (!data) return;
-        queryClient.invalidateQueries(
-          trpc.knowledge.get.queryFilter({ id: data.id }),
-        );
-        queryClient.invalidateQueries(
-          trpc.knowledge.getAncestors.queryFilter({ id: data.id }),
-        );
-        queryClient.invalidateQueries(
-          trpc.knowledge.listChildren.queryFilter({ parentId: data.parentId }),
-        );
+        queryClient.invalidateQueries(trpc.knowledge.get.queryFilter({ id: data.id }));
+        queryClient.invalidateQueries(trpc.knowledge.getAncestors.queryFilter({ id: data.id }));
+        queryClient.invalidateQueries(trpc.knowledge.listChildren.queryFilter({ parentId: data.parentId }));
         queryClient.invalidateQueries(trpc.knowledge.listSpaces.queryFilter());
         queryClient.invalidateQueries(trpc.knowledge.listTree.queryFilter());
       },
@@ -324,17 +328,12 @@ export const useDeleteNode = () => {
   return useMutation(
     trpc.knowledge.delete.mutationOptions({
       onMutate: async (variables) => {
-        const previous = new Map<
-          readonly unknown[],
-          KnowledgeNode[] | undefined
-        >();
+        const previous = new Map<readonly unknown[], KnowledgeNode[] | undefined>();
 
         const filter = trpc.knowledge.listChildren.queryFilter();
         await queryClient.cancelQueries(filter);
 
-        for (const [key, data] of queryClient.getQueriesData<KnowledgeNode[]>(
-          filter,
-        )) {
+        for (const [key, data] of queryClient.getQueriesData<KnowledgeNode[]>(filter)) {
           if (data?.some((node) => node.id === variables.id)) {
             previous.set(key, data);
             queryClient.setQueryData<KnowledgeNode[]>(
@@ -353,15 +352,10 @@ export const useDeleteNode = () => {
         toast.error(`Failed to delete: ${error.message}`);
       },
       onSettled: (data) => {
-        queryClient.invalidateQueries(
-          trpc.knowledge.listChildren.queryFilter(),
-        );
+        queryClient.invalidateQueries(trpc.knowledge.listChildren.queryFilter());
         queryClient.invalidateQueries(trpc.knowledge.listSpaces.queryFilter());
         queryClient.invalidateQueries(trpc.knowledge.listTree.queryFilter());
-        if (data)
-          queryClient.removeQueries(
-            trpc.knowledge.get.queryFilter({ id: data.id }),
-          );
+        if (data) queryClient.removeQueries(trpc.knowledge.get.queryFilter({ id: data.id }));
       },
     }),
   );
@@ -371,14 +365,11 @@ export const useNodeImage = (nodeId: string) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  const createUploadUrl = useMutation(
-    trpc.knowledge.createImageUploadUrl.mutationOptions(),
-  );
+  const createUploadUrl = useMutation(trpc.knowledge.createImageUploadUrl.mutationOptions());
   const attachImage = useMutation(trpc.knowledge.attachImage.mutationOptions());
   const removeImage = useMutation(
     trpc.knowledge.removeImage.mutationOptions({
-      onError: (error) =>
-        toast.error(`Failed to remove image: ${error.message}`),
+      onError: (error) => toast.error(`Failed to remove image: ${error.message}`),
     }),
   );
 
@@ -386,9 +377,7 @@ export const useNodeImage = (nodeId: string) => {
 
   const invalidate = () => {
     queryClient.invalidateQueries(trpc.knowledge.listChildren.queryFilter());
-    queryClient.invalidateQueries(
-      trpc.knowledge.get.queryFilter({ id: nodeId }),
-    );
+    queryClient.invalidateQueries(trpc.knowledge.get.queryFilter({ id: nodeId }));
     queryClient.invalidateQueries(trpc.knowledge.search.queryFilter());
   };
 
@@ -420,9 +409,7 @@ export const useNodeImage = (nodeId: string) => {
       invalidate();
       return true;
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to upload image",
-      );
+      toast.error(error instanceof Error ? error.message : "Failed to upload image");
       return false;
     } finally {
       setIsUploading(false);
@@ -445,9 +432,7 @@ export const useNodeImage = (nodeId: string) => {
 export const useContentImageUpload = (nodeId: string) => {
   const trpc = useTRPC();
 
-  const createUploadUrl = useMutation(
-    trpc.knowledge.createImageUploadUrl.mutationOptions(),
-  );
+  const createUploadUrl = useMutation(trpc.knowledge.createImageUploadUrl.mutationOptions());
 
   const [isUploading, setIsUploading] = useState(false);
 
@@ -469,9 +454,7 @@ export const useContentImageUpload = (nodeId: string) => {
 
       return publicUrl;
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to upload image",
-      );
+      toast.error(error instanceof Error ? error.message : "Failed to upload image");
       return null;
     } finally {
       setIsUploading(false);
@@ -500,12 +483,8 @@ export const useMoveNode = () => {
   return useMutation(
     trpc.knowledge.move.mutationOptions({
       onSuccess: (data) => {
-        queryClient.invalidateQueries(
-          trpc.knowledge.listChildren.queryFilter(),
-        );
-        queryClient.invalidateQueries(
-          trpc.knowledge.getAncestors.queryFilter({ id: data.id }),
-        );
+        queryClient.invalidateQueries(trpc.knowledge.listChildren.queryFilter());
+        queryClient.invalidateQueries(trpc.knowledge.getAncestors.queryFilter({ id: data.id }));
         queryClient.invalidateQueries(trpc.knowledge.listSpaces.queryFilter());
         queryClient.invalidateQueries(trpc.knowledge.listTree.queryFilter());
       },
