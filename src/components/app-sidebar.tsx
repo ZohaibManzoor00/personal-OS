@@ -1,6 +1,6 @@
 "use client";
 
-import { CreditCardIcon, FolderOpenIcon, HistoryIcon, KeyIcon, LogOutIcon, StarIcon } from "lucide-react";
+import { BookIcon, BriefcaseIcon, CreditCardIcon, HomeIcon, LogOutIcon, StarIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -30,7 +30,7 @@ export const AppSidebar = () => {
           <SidebarMenuButton asChild className="gap-x-4 h-10 px-4">
             <Link href="/" prefetch>
               <Image src="/logos/logo.svg" alt="Zeno" width={30} height={30} />
-              <span className="font-semibold text-sm">Zeno</span>
+              <span className="font-semibold text-sm">Zo's Journey</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -105,20 +105,25 @@ const menuItems = [
     title: "Main",
     items: [
       {
-        title: "Workflows",
-        icon: FolderOpenIcon,
-        url: "/workflows",
+        title: "Dashboard",
+        icon: HomeIcon,
+        url: "/dashboard",
       },
       {
-        title: "Credentials",
-        icon: KeyIcon,
-        url: "/credentials",
+        title: "Knowledge",
+        icon: BookIcon,
+        url: "/knowledge",
       },
       {
-        title: "Executions",
-        icon: HistoryIcon,
-        url: "/executions",
+        title: "Career",
+        icon: BriefcaseIcon,
+        url: "/career",
       },
+      // {
+      //   title: "Workflows",
+      //   icon: FolderOpenIcon,
+      //   url: "/workflows",
+      // },
     ],
   },
 ];

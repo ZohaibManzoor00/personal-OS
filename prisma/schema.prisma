@@ -15,9 +15,10 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  sessions      Session[]
-  accounts      Account[]
-  workflows     Workflow[]
+
+  sessions Session[]
+  accounts Account[]
+  nodes    Node[]
 
   @@unique([email])
   @@map("user")
@@ -31,8 +32,9 @@ model Session {
   updatedAt DateTime @updatedAt
   ipAddress String?
   userAgent String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([token])
   @@index([userId])
@@ -43,8 +45,6 @@ model Account {
   id                    String    @id
   accountId             String
   providerId            String
-  userId                String
-  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   accessToken           String?
   refreshToken          String?
   idToken               String?
@@ -54,6 +54,9 @@ model Account {
   password              String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("account")
@@ -71,13 +74,65 @@ model Verification {
   @@map("verification")
 }
 
-model Workflow {
-  id   String @id @default(cuid())
-  name String
+model Node {
+  id    String @id @default(cuid())
+  title String
+  slug  String
+
+  type NodeType
+
+  /// Rich text content (Markdown, HTML, or Tiptap JSON string)
+  body String? @db.Text
+
+  /// Manual ordering of siblings
+  sortOrder Int @default(0)
+
+  /// Emoji or icon name
+  icon String?
+
+  parentId String?
+  parent   Node?  @relation("NodeTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children Node[] @relation("NodeTree")
+
+  images NodeImage[]
 
   userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  archivedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([parentId])
+  @@unique([userId, parentId, slug])
+}
+
+model NodeImage {
+  id String @id @default(cuid())
+
+  nodeId String
+  node   Node @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  /// Public URL returned from your storage provider
+  url String
+
+  /// Storage path/key (useful for deletes & migrations)
+  storageKey String
+
+  filename String?
+  altText  String?
+
+  width  Int?
+  height Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([nodeId])
+}
+
+enum NodeType {
+  SPACE
+  PAGE
 }

@@ -1,8 +1,8 @@
+import { knowledgeRouter } from "@/features/knowledge/server/router";
 import { createTRPCRouter } from "@/trpc/init";
-import { workflowsRouter } from "@/features/workflows/server/router";
 
 export const appRouter = createTRPCRouter({
-  workflows: workflowsRouter,
+  knowledge: knowledgeRouter,
 });
 
 export type AppRouter = typeof appRouter;
