@@ -6,7 +6,7 @@ import {
 } from "@tanstack/react-query";
 import { useQueryStates } from "nuqs";
 import { parseAsString } from "nuqs/server";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
 import type { KnowledgeNode } from "../types";
@@ -84,6 +84,35 @@ export const useKnowledgeView = () => {
   }, []);
 
   return [view, setKnowledgeView] as const;
+};
+
+/**
+ * Tracks whether the referenced element has scrolled up and out of the top of
+ * the viewport. Uses a callback ref so it attaches correctly even when the
+ * target only mounts after a Suspense boundary resolves.
+ */
+export const useScrolledPast = () => {
+  const [scrolledPast, setScrolledPast] = useState(false);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+
+  const ref = useCallback((node: HTMLElement | null) => {
+    observerRef.current?.disconnect();
+    if (!node) return;
+
+    observerRef.current = new IntersectionObserver(
+      ([entry]) => {
+        setScrolledPast(
+          !entry.isIntersecting && entry.boundingClientRect.top < 0,
+        );
+      },
+      { threshold: 0 },
+    );
+    observerRef.current.observe(node);
+  }, []);
+
+  useEffect(() => () => observerRef.current?.disconnect(), []);
+
+  return { ref, scrolledPast };
 };
 
 export const useKnowledgeNode = (id: string) => {

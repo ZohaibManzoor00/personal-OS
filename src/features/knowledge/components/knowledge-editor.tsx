@@ -20,9 +20,11 @@ const isImageFile = (file: File) =>
 export const KnowledgeEditor = ({
   nodeId,
   onDeleted,
+  sentinelRef,
 }: {
   nodeId: string;
   onDeleted?: () => void;
+  sentinelRef?: React.Ref<HTMLDivElement>;
 }) => {
   const { data: node } = useKnowledgeNode(nodeId);
   const updateNode = useUpdateNode();
@@ -130,7 +132,7 @@ export const KnowledgeEditor = ({
 
   return (
     <div className="flex h-full flex-col gap-6">
-      <div className="flex items-start justify-between gap-4">
+      <div ref={sentinelRef} className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
           <h1 className="truncate font-heading text-2xl font-semibold tracking-tight">
             {node.title}
