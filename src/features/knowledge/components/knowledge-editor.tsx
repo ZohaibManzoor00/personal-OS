@@ -13,6 +13,7 @@ import { KnowledgeNodeMenu } from "./knowledge-node-menu";
 
 const AUTOSAVE_DELAY = 800;
 const ACCEPTED_TYPES = ["png", "jpeg", "webp", "gif", "avif"];
+const INDENT = "  ";
 
 const isImageFile = (file: File) =>
   ACCEPTED_TYPES.some((type) => file.type === `image/${type}`);
@@ -118,6 +119,48 @@ export const KnowledgeEditor = ({
     handleFiles(files);
   };
 
+  // Tab/Shift+Tab indents or outdents the lines spanning the selection so you
+  // can build nested bullets instead of moving focus off the textarea.
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key !== "Tab") return;
+    event.preventDefault();
+
+    const textarea = event.currentTarget;
+    const { selectionStart, selectionEnd, value } = textarea;
+    const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
+    const block = value.slice(lineStart, selectionEnd);
+    const lines = block.split("\n");
+
+    let nextBlock: string;
+    let startDelta: number;
+    let sizeDelta: number;
+
+    if (event.shiftKey) {
+      const removals = lines.map((line) => {
+        if (line.startsWith(INDENT)) return INDENT.length;
+        if (line.startsWith("\t")) return 1;
+        return line.length - line.trimStart().length ? 1 : 0;
+      });
+      nextBlock = lines.map((line, i) => line.slice(removals[i])).join("\n");
+      startDelta = -removals[0];
+      sizeDelta = -removals.reduce((sum, n) => sum + n, 0);
+    } else {
+      nextBlock = lines.map((line) => INDENT + line).join("\n");
+      startDelta = INDENT.length;
+      sizeDelta = INDENT.length * lines.length;
+    }
+
+    const nextValue =
+      value.slice(0, lineStart) + nextBlock + value.slice(selectionEnd);
+    setContent(nextValue);
+
+    const nextStart = Math.max(lineStart, selectionStart + startDelta);
+    const nextEnd = Math.max(nextStart, selectionEnd + sizeDelta);
+    requestAnimationFrame(() => {
+      textarea.setSelectionRange(nextStart, nextEnd);
+    });
+  };
+
   const enterEdit = () => setIsEditing(true);
   const exitEdit = () => {
     handleSave();
@@ -205,6 +248,7 @@ export const KnowledgeEditor = ({
           ref={textareaRef}
           value={content}
           onChange={(event) => setContent(event.target.value)}
+          onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           onDrop={handleDrop}
           onDragOver={(event) => event.preventDefault()}
