@@ -1,19 +1,26 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { CheckIcon, ImageIcon, Loader2Icon, PencilIcon } from "lucide-react";
+import {
+  CheckIcon,
+  ImageIcon,
+  Loader2Icon,
+  PencilIcon,
+  TerminalIcon,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+import { Toggle } from "@/components/ui/toggle";
 import { useKnowledgeNode, useUpdateNode } from "../hooks/use-knowledge";
+import { useVimMode } from "../hooks/use-vim-mode";
 import { KnowledgeImageInsertDialog } from "./knowledge-image-insert-dialog";
 import { KnowledgeMarkdown } from "./knowledge-markdown";
 import { KnowledgeNodeMenu } from "./knowledge-node-menu";
+import { MarkdownEditor, type MarkdownEditorHandle } from "./markdown-editor";
 
 const AUTOSAVE_DELAY = 800;
 const ACCEPTED_TYPES = ["png", "jpeg", "webp", "gif", "avif"];
-const INDENT = "  ";
 
 const isImageFile = (file: File) =>
   ACCEPTED_TYPES.some((type) => file.type === `image/${type}`);
@@ -32,9 +39,10 @@ export const KnowledgeEditor = ({
 
   const [isEditing, setIsEditing] = useState(false);
   const [autoSave, setAutoSave] = useState(false);
+  const [vimMode, setVimMode] = useVimMode();
   const [content, setContent] = useState(node.body ?? "");
   const [pendingImages, setPendingImages] = useState<File[]>([]);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<MarkdownEditorHandle>(null);
   const insertPosRef = useRef<number | null>(null);
 
   // Only pull server content into the editor while viewing, so an in-flight
@@ -75,7 +83,7 @@ export const KnowledgeEditor = ({
       const images = Array.from(files).filter(isImageFile);
       if (images.length === 0) return;
       insertPosRef.current =
-        textareaRef.current?.selectionStart ?? content.length;
+        editorRef.current?.getSelectionHead() ?? content.length;
       setPendingImages((prev) => [...prev, ...images]);
     },
     [content.length],
@@ -103,62 +111,6 @@ export const KnowledgeEditor = ({
       if (input.files) handleFiles(input.files);
     };
     input.click();
-  };
-
-  const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const files = Array.from(event.clipboardData.files).filter(isImageFile);
-    if (files.length === 0) return;
-    event.preventDefault();
-    handleFiles(files);
-  };
-
-  const handleDrop = (event: React.DragEvent<HTMLTextAreaElement>) => {
-    const files = Array.from(event.dataTransfer.files).filter(isImageFile);
-    if (files.length === 0) return;
-    event.preventDefault();
-    handleFiles(files);
-  };
-
-  // Tab/Shift+Tab indents or outdents the lines spanning the selection so you
-  // can build nested bullets instead of moving focus off the textarea.
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key !== "Tab") return;
-    event.preventDefault();
-
-    const textarea = event.currentTarget;
-    const { selectionStart, selectionEnd, value } = textarea;
-    const lineStart = value.lastIndexOf("\n", selectionStart - 1) + 1;
-    const block = value.slice(lineStart, selectionEnd);
-    const lines = block.split("\n");
-
-    let nextBlock: string;
-    let startDelta: number;
-    let sizeDelta: number;
-
-    if (event.shiftKey) {
-      const removals = lines.map((line) => {
-        if (line.startsWith(INDENT)) return INDENT.length;
-        if (line.startsWith("\t")) return 1;
-        return line.length - line.trimStart().length ? 1 : 0;
-      });
-      nextBlock = lines.map((line, i) => line.slice(removals[i])).join("\n");
-      startDelta = -removals[0];
-      sizeDelta = -removals.reduce((sum, n) => sum + n, 0);
-    } else {
-      nextBlock = lines.map((line) => INDENT + line).join("\n");
-      startDelta = INDENT.length;
-      sizeDelta = INDENT.length * lines.length;
-    }
-
-    const nextValue =
-      value.slice(0, lineStart) + nextBlock + value.slice(selectionEnd);
-    setContent(nextValue);
-
-    const nextStart = Math.max(lineStart, selectionStart + startDelta);
-    const nextEnd = Math.max(nextStart, selectionEnd + sizeDelta);
-    requestAnimationFrame(() => {
-      textarea.setSelectionRange(nextStart, nextEnd);
-    });
   };
 
   const enterEdit = () => setIsEditing(true);
@@ -208,6 +160,17 @@ export const KnowledgeEditor = ({
                 />
                 Auto-save
               </div>
+              <Toggle
+                variant="outline"
+                size="sm"
+                pressed={vimMode}
+                onPressedChange={setVimMode}
+                aria-label="Toggle vim mode"
+                title="Vim mode"
+              >
+                <TerminalIcon className="size-4" />
+                Vim
+              </Toggle>
               <Button variant="outline" size="sm" onClick={handlePickImage}>
                 <ImageIcon className="size-4" />
                 Image
@@ -244,16 +207,15 @@ export const KnowledgeEditor = ({
       </div>
 
       {isEditing ? (
-        <Textarea
-          ref={textareaRef}
+        <MarkdownEditor
+          ref={editorRef}
           value={content}
-          onChange={(event) => setContent(event.target.value)}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          onDrop={handleDrop}
-          onDragOver={(event) => event.preventDefault()}
+          onChange={setContent}
+          vimMode={vimMode}
+          isImageFile={isImageFile}
+          onImageFiles={handleFiles}
           placeholder="Start writing in Markdown… paste or drop images to embed them."
-          className="min-h-[420px] flex-1 resize-none rounded-xl border-border bg-card p-6 font-mono text-sm leading-relaxed shadow-xs focus-visible:ring-0"
+          className="min-h-[420px] flex-1 rounded-xl border border-border bg-card shadow-xs"
         />
       ) : content.trim() ? (
         <KnowledgeMarkdown content={content} className="flex-1" />
