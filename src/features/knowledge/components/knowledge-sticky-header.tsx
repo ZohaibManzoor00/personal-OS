@@ -6,7 +6,12 @@ import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import { useAncestors, useKnowledgeNode } from "../hooks/use-knowledge";
+import {
+  useAncestors,
+  useKnowledgeNode,
+  useScrollProgress,
+} from "../hooks/use-knowledge";
+import { KnowledgePageSearch } from "./knowledge-page-search";
 
 /**
  * Overlay bar that slides down and pins to the top of the page once the main
@@ -17,12 +22,17 @@ import { useAncestors, useKnowledgeNode } from "../hooks/use-knowledge";
 export const KnowledgeStickyHeader = ({
   nodeId,
   visible,
+  search,
+  onSearchChange,
 }: {
   nodeId: string;
   visible: boolean;
+  search: string;
+  onSearchChange: (value: string) => void;
 }) => {
   const { data: node } = useKnowledgeNode(nodeId);
   const { data: ancestors } = useAncestors(nodeId);
+  const progress = useScrollProgress();
 
   // The current node is the last ancestor — drop it so the trail only shows
   // the path leading up to the title we render alongside it.
@@ -60,7 +70,9 @@ export const KnowledgeStickyHeader = ({
         style={{ left: bounds?.left ?? 0, width: bounds?.width ?? "100%" }}
         className={cn(
           "fixed top-0 z-30 flex h-14 items-center gap-2 border-b border-border/60 bg-background/80 px-4 backdrop-blur-md transition-[transform,opacity] duration-300 ease-out",
-          visible ? "translate-y-0 opacity-100" : "-translate-y-full opacity-0",
+          visible
+            ? "translate-y-0 opacity-100"
+            : "pointer-events-none -translate-y-full opacity-0",
         )}
       >
         <SidebarTrigger className="-ml-1" />
@@ -88,9 +100,21 @@ export const KnowledgeStickyHeader = ({
           {node.title}
         </span>
 
-        <span className="shrink-0 text-xs text-muted-foreground">
+        <KnowledgePageSearch
+          value={search}
+          onChange={onSearchChange}
+          className="ml-2 w-56 shrink-0"
+        />
+
+        <span className="ml-3 hidden shrink-0 text-xs text-muted-foreground lg:block">
           Updated {formatDistanceToNow(node.updatedAt, { addSuffix: true })}
         </span>
+
+        <div
+          aria-hidden
+          style={{ transform: `scaleX(${progress})` }}
+          className="absolute inset-x-0 -bottom-px h-px origin-left bg-linear-to-r from-primary/40 to-primary/80 transition-transform duration-150 ease-out"
+        />
       </div>
     </>
   );

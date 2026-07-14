@@ -6,7 +6,14 @@ import {
 } from "@tanstack/react-query";
 import { useQueryStates } from "nuqs";
 import { parseAsString } from "nuqs/server";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
 import type { KnowledgeNode } from "../types";
@@ -115,6 +122,43 @@ export const useScrolledPast = () => {
   return { ref, scrolledPast };
 };
 
+/**
+ * Tracks how far the document has been scrolled as a 0–1 fraction, so callers
+ * can show reading progress. Recomputes on scroll and resize (content height
+ * shifts as images load), throttled to one update per animation frame.
+ */
+export const useScrollProgress = () => {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    let frame = 0;
+
+    const update = () => {
+      frame = 0;
+      const doc = document.documentElement;
+      const scrollable = doc.scrollHeight - window.innerHeight;
+      setProgress(scrollable > 0 ? Math.min(1, window.scrollY / scrollable) : 0);
+    };
+
+    const schedule = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
+  }, []);
+
+  return progress;
+};
+
 export const useKnowledgeNode = (id: string) => {
   const trpc = useTRPC();
   return useSuspenseQuery(trpc.knowledge.get.queryOptions({ id }));
@@ -154,6 +198,44 @@ export const useRecordView = (id: string) => {
   useEffect(() => {
     mutate({ id });
   }, [id, mutate]);
+};
+
+/**
+ * Focuses the given search input on ⌘K / Ctrl+K (advertised) and also on the
+ * intentionally-undocumented ⌘L / Ctrl+L. When several inputs register this
+ * (e.g. the inline and sticky-header page search), only the one currently
+ * on-screen responds, so the shortcut always lands on the visible field.
+ */
+export const useSearchFocusHotkey = (
+  ref: React.RefObject<HTMLInputElement | null>,
+) => {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      const key = event.key.toLowerCase();
+      if (key !== "k" && key !== "l") return;
+
+      const input = ref.current;
+      if (!input) return;
+
+      // Ignore instances that are scrolled out of view or otherwise hidden, so
+      // duplicate mounts don't steal focus to an off-screen field.
+      const rect = input.getBoundingClientRect();
+      const onScreen =
+        rect.width > 0 &&
+        rect.height > 0 &&
+        rect.bottom > 8 &&
+        rect.top < window.innerHeight;
+      if (!onScreen) return;
+
+      event.preventDefault();
+      input.focus();
+      input.select();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [ref]);
 };
 
 export const useKnowledgeSearch = (query: string) => {
@@ -397,6 +479,18 @@ export const useContentImageUpload = (nodeId: string) => {
   };
 
   return { upload, isUploading };
+};
+
+export const usePolishMarkdown = () => {
+  const trpc = useTRPC();
+
+  return useMutation(
+    trpc.knowledge.polishMarkdown.mutationOptions({
+      onError: (error) => {
+        toast.error(`Failed to format: ${error.message}`);
+      },
+    }),
+  );
 };
 
 export const useMoveNode = () => {

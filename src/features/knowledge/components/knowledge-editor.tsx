@@ -6,13 +6,18 @@ import {
   ImageIcon,
   Loader2Icon,
   PencilIcon,
+  SparklesIcon,
   TerminalIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Toggle } from "@/components/ui/toggle";
-import { useKnowledgeNode, useUpdateNode } from "../hooks/use-knowledge";
+import {
+  useKnowledgeNode,
+  usePolishMarkdown,
+  useUpdateNode,
+} from "../hooks/use-knowledge";
 import { useVimMode } from "../hooks/use-vim-mode";
 import { KnowledgeImageInsertDialog } from "./knowledge-image-insert-dialog";
 import { KnowledgeMarkdown } from "./knowledge-markdown";
@@ -36,6 +41,7 @@ export const KnowledgeEditor = ({
 }) => {
   const { data: node } = useKnowledgeNode(nodeId);
   const updateNode = useUpdateNode();
+  const polishMarkdown = usePolishMarkdown();
 
   const [isEditing, setIsEditing] = useState(false);
   const [autoSave, setAutoSave] = useState(false);
@@ -113,6 +119,16 @@ export const KnowledgeEditor = ({
     input.click();
   };
 
+  // Ask the AI to rewrite the current text as clean Markdown and swap it in.
+  // The replacement is a single CodeMirror edit, so it can be undone (u / ⌘Z).
+  const handlePolish = () => {
+    if (polishMarkdown.isPending || !content.trim()) return;
+    polishMarkdown.mutate(
+      { text: content },
+      { onSuccess: (result) => setContent(result.markdown) },
+    );
+  };
+
   const enterEdit = () => setIsEditing(true);
   const exitEdit = () => {
     handleSave();
@@ -171,6 +187,20 @@ export const KnowledgeEditor = ({
                 <TerminalIcon className="size-4" />
                 Vim
               </Toggle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePolish}
+                disabled={polishMarkdown.isPending || !content.trim()}
+                title="Reformat as clean Markdown with AI"
+              >
+                {polishMarkdown.isPending ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : (
+                  <SparklesIcon className="size-4" />
+                )}
+                Format
+              </Button>
               <Button variant="outline" size="sm" onClick={handlePickImage}>
                 <ImageIcon className="size-4" />
                 Image

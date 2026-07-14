@@ -8,13 +8,13 @@ datasource db {
 }
 
 model User {
-  id            String    @id
+  id            String   @id
   name          String
   email         String
-  emailVerified Boolean   @default(false)
+  emailVerified Boolean  @default(false)
   image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   sessions Session[]
   accounts Account[]
@@ -34,7 +34,7 @@ model Session {
   userAgent String?
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([token])
   @@index([userId])
@@ -56,7 +56,7 @@ model Account {
   updatedAt             DateTime  @updatedAt
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("account")
@@ -91,13 +91,13 @@ model Node {
   icon String?
 
   parentId String?
-  parent   Node?  @relation("NodeTree", fields: [parentId], references: [id], onDelete: Cascade)
-  children Node[] @relation("NodeTree")
+  parent   Node?   @relation("NodeTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children Node[]  @relation("NodeTree")
 
   images NodeImage[]
 
   userId String
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   archivedAt   DateTime?
   lastViewedAt DateTime?
@@ -105,17 +105,24 @@ model Node {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// Postgres full-text index over title (weight A) + body (weight B). Created
+  /// as a STORED generated column via raw SQL (see prisma/sql), so it is
+  /// auto-maintained by Postgres on every write. Not queryable through the
+  /// Prisma Client — use $queryRaw with @@ / to_tsquery against it.
+  searchVector Unsupported("tsvector")? @default(dbgenerated())
+
+  @@unique([userId, parentId, slug])
   @@index([userId])
   @@index([parentId])
   @@index([userId, lastViewedAt])
-  @@unique([userId, parentId, slug])
+  @@index([searchVector], type: Gin)
 }
 
 model NodeImage {
   id String @id @default(cuid())
 
   nodeId String
-  node   Node @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  node   Node   @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
   /// Public URL returned from your storage provider
   url String
