@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorView, LoadingView } from "@/components/entity-component";
-import { useKnowledgeNode } from "../hooks/use-knowledge";
+import { useKnowledgeNode, useRecordView } from "../hooks/use-knowledge";
 import { KnowledgeBreadcrumb } from "./knowledge-breadcrumb";
 import { KnowledgeEditor } from "./knowledge-editor";
 
@@ -24,6 +24,8 @@ export const KnowledgePageView = ({ nodeId }: { nodeId: string }) => {
 const KnowledgePageContent = ({ nodeId }: { nodeId: string }) => {
   const router = useRouter();
   const { data: node } = useKnowledgeNode(nodeId);
+
+  useRecordView(nodeId);
 
   const goToParent = () =>
     router.push(node.parentId ? `/knowledge/${node.parentId}` : "/knowledge");

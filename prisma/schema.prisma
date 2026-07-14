@@ -99,13 +99,15 @@ model Node {
   userId String
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  archivedAt DateTime?
+  archivedAt   DateTime?
+  lastViewedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([parentId])
+  @@index([userId, lastViewedAt])
   @@unique([userId, parentId, slug])
 }
 

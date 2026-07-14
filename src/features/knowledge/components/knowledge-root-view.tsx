@@ -4,12 +4,14 @@ import { Suspense, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorView, LoadingView } from "@/components/entity-component";
 import { useKnowledgeParams, useListChildren } from "../hooks/use-knowledge";
+import { KnowledgeCollection } from "./knowledge-collection";
 import { KnowledgeEmptyState } from "./knowledge-empty-state";
-import { KnowledgeGrid } from "./knowledge-grid";
 import { KnowledgeHeader } from "./knowledge-header";
 import { KnowledgeNodeDialog } from "./knowledge-node-dialog";
+import { KnowledgeRecent } from "./knowledge-recent";
 import { KnowledgeSearch } from "./knowledge-search";
 import { KnowledgeSearchResults } from "./knowledge-search-results";
+import { KnowledgeViewToggle } from "./knowledge-view-toggle";
 
 type CreateHandlers = {
   onNewSpace: () => void;
@@ -36,7 +38,12 @@ export const KnowledgeRootView = () => {
         description="Your personal knowledge base"
         {...handlers}
       />
-      <KnowledgeSearch />
+      <KnowledgeRecentSection />
+
+      <div className="flex items-center justify-between gap-3">
+        <KnowledgeSearch />
+        <KnowledgeViewToggle />
+      </div>
 
       <ErrorBoundary fallback={<ErrorView message="Error loading knowledge" />}>
         <Suspense fallback={<LoadingView message="Loading knowledge..." />}>
@@ -52,6 +59,20 @@ export const KnowledgeRootView = () => {
         onOpenChange={(open) => setCreate((prev) => ({ ...prev, open }))}
       />
     </div>
+  );
+};
+
+const KnowledgeRecentSection = () => {
+  const [params] = useKnowledgeParams();
+
+  if (params.search.trim().length > 0) return null;
+
+  return (
+    <ErrorBoundary fallback={null}>
+      <Suspense fallback={null}>
+        <KnowledgeRecent />
+      </Suspense>
+    </ErrorBoundary>
   );
 };
 
@@ -74,5 +95,5 @@ const KnowledgeRootContent = ({ onNewSpace, onNewPage }: CreateHandlers) => {
     );
   }
 
-  return <KnowledgeGrid items={items} />;
+  return <KnowledgeCollection parentId={null} items={items} />;
 };

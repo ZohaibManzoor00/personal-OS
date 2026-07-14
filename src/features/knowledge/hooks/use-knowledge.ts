@@ -6,7 +6,7 @@ import {
 } from "@tanstack/react-query";
 import { useQueryStates } from "nuqs";
 import { parseAsString } from "nuqs/server";
-import { useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
 import type { KnowledgeNode } from "../types";
@@ -41,6 +41,51 @@ export const useListChildren = (parentId: string | null) => {
   );
 };
 
+export const useKnowledgeTree = (enabled = true) => {
+  const trpc = useTRPC();
+  return useQuery(trpc.knowledge.listTree.queryOptions(undefined, { enabled }));
+};
+
+export type KnowledgeView = "cards" | "tree";
+
+const VIEW_STORAGE_KEY = "knowledge:view";
+
+// Module-level store so every toggle/consumer (search bar, tree, cards) stays in
+// sync live, while still persisting the choice to localStorage.
+let currentView: KnowledgeView = "cards";
+const viewListeners = new Set<() => void>();
+
+const setKnowledgeView = (next: KnowledgeView) => {
+  if (next === currentView) return;
+  currentView = next;
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(VIEW_STORAGE_KEY, next);
+  }
+  for (const listener of viewListeners) listener();
+};
+
+const subscribeView = (listener: () => void) => {
+  viewListeners.add(listener);
+  return () => {
+    viewListeners.delete(listener);
+  };
+};
+
+export const useKnowledgeView = () => {
+  const view = useSyncExternalStore(
+    subscribeView,
+    () => currentView,
+    () => "cards" as KnowledgeView,
+  );
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(VIEW_STORAGE_KEY);
+    if (stored === "cards" || stored === "tree") setKnowledgeView(stored);
+  }, []);
+
+  return [view, setKnowledgeView] as const;
+};
+
 export const useKnowledgeNode = (id: string) => {
   const trpc = useTRPC();
   return useSuspenseQuery(trpc.knowledge.get.queryOptions({ id }));
@@ -56,6 +101,30 @@ export const useSpaces = (enabled = true) => {
   return useQuery(
     trpc.knowledge.listSpaces.queryOptions(undefined, { enabled }),
   );
+};
+
+export const useRecentNodes = () => {
+  const trpc = useTRPC();
+  return useSuspenseQuery(trpc.knowledge.listRecent.queryOptions());
+};
+
+export const useRecordView = (id: string) => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  const recordView = useMutation(
+    trpc.knowledge.recordView.mutationOptions({
+      onSuccess: () => {
+        queryClient.invalidateQueries(trpc.knowledge.listRecent.queryFilter());
+      },
+    }),
+  );
+
+  const mutate = recordView.mutate;
+
+  useEffect(() => {
+    mutate({ id });
+  }, [id, mutate]);
 };
 
 export const useKnowledgeSearch = (query: string) => {
@@ -79,6 +148,7 @@ export const useCreateNode = () => {
           trpc.knowledge.listChildren.queryFilter({ parentId: data.parentId }),
         );
         queryClient.invalidateQueries(trpc.knowledge.listSpaces.queryFilter());
+        queryClient.invalidateQueries(trpc.knowledge.listTree.queryFilter());
       },
       onError: (error) => {
         toast.error(`Failed to create: ${error.message}`);
@@ -130,6 +200,7 @@ export const useUpdateNode = () => {
           trpc.knowledge.listChildren.queryFilter({ parentId: data.parentId }),
         );
         queryClient.invalidateQueries(trpc.knowledge.listSpaces.queryFilter());
+        queryClient.invalidateQueries(trpc.knowledge.listTree.queryFilter());
       },
     }),
   );
@@ -175,6 +246,7 @@ export const useDeleteNode = () => {
           trpc.knowledge.listChildren.queryFilter(),
         );
         queryClient.invalidateQueries(trpc.knowledge.listSpaces.queryFilter());
+        queryClient.invalidateQueries(trpc.knowledge.listTree.queryFilter());
         if (data)
           queryClient.removeQueries(
             trpc.knowledge.get.queryFilter({ id: data.id }),
@@ -254,6 +326,50 @@ export const useNodeImage = (nodeId: string) => {
   return { upload, remove, isUploading, isRemoving: removeImage.isPending };
 };
 
+/**
+ * Uploads an image to R2 for embedding inside page content (Markdown body).
+ * Unlike `useNodeImage`, this does NOT touch the cover image / DB — it just
+ * stores the file and returns its stable public URL to drop into the body.
+ */
+export const useContentImageUpload = (nodeId: string) => {
+  const trpc = useTRPC();
+
+  const createUploadUrl = useMutation(
+    trpc.knowledge.createImageUploadUrl.mutationOptions(),
+  );
+
+  const [isUploading, setIsUploading] = useState(false);
+
+  const upload = async (file: File): Promise<string | null> => {
+    setIsUploading(true);
+    try {
+      const { uploadUrl, publicUrl } = await createUploadUrl.mutateAsync({
+        nodeId,
+        contentType: file.type,
+      });
+      if (!uploadUrl) throw new Error("Could not create upload URL");
+
+      const response = await fetch(uploadUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+      if (!response.ok) throw new Error("Upload failed");
+
+      return publicUrl;
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to upload image",
+      );
+      return null;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return { upload, isUploading };
+};
+
 export const useMoveNode = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -268,6 +384,7 @@ export const useMoveNode = () => {
           trpc.knowledge.getAncestors.queryFilter({ id: data.id }),
         );
         queryClient.invalidateQueries(trpc.knowledge.listSpaces.queryFilter());
+        queryClient.invalidateQueries(trpc.knowledge.listTree.queryFilter());
       },
       onError: (error) => {
         toast.error(`Failed to move: ${error.message}`);

@@ -4,13 +4,18 @@ import { useRouter } from "next/navigation";
 import { Suspense, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorView, LoadingView } from "@/components/entity-component";
-import { useKnowledgeNode, useListChildren } from "../hooks/use-knowledge";
+import {
+  useKnowledgeNode,
+  useListChildren,
+  useRecordView,
+} from "../hooks/use-knowledge";
 import { KnowledgeBreadcrumb } from "./knowledge-breadcrumb";
+import { KnowledgeCollection } from "./knowledge-collection";
 import { KnowledgeEmptyState } from "./knowledge-empty-state";
-import { KnowledgeGrid } from "./knowledge-grid";
 import { KnowledgeHeader } from "./knowledge-header";
 import { KnowledgeNodeDialog } from "./knowledge-node-dialog";
 import { KnowledgeNodeMenu } from "./knowledge-node-menu";
+import { KnowledgeViewToggle } from "./knowledge-view-toggle";
 
 type CreateHandlers = {
   onNewSpace: () => void;
@@ -20,6 +25,8 @@ type CreateHandlers = {
 export const KnowledgeSpaceView = ({ nodeId }: { nodeId: string }) => {
   const router = useRouter();
   const { data: node } = useKnowledgeNode(nodeId);
+
+  useRecordView(nodeId);
 
   const [create, setCreate] = useState<{
     open: boolean;
@@ -85,5 +92,12 @@ const KnowledgeSpaceChildren = ({
     );
   }
 
-  return <KnowledgeGrid items={items} />;
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex justify-end">
+        <KnowledgeViewToggle />
+      </div>
+      <KnowledgeCollection parentId={nodeId} items={items} />
+    </div>
+  );
 };

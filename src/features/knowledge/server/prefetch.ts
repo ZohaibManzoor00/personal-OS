@@ -15,3 +15,7 @@ export const prefetchAncestors = (id: string) => {
 export const prefetchSpaces = () => {
   return prefetch(trpc.knowledge.listSpaces.queryOptions());
 };
+
+export const prefetchRecent = () => {
+  return prefetch(trpc.knowledge.listRecent.queryOptions());
+};

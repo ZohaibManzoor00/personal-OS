@@ -6,6 +6,7 @@ import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { slugify } from "../lib/slug";
 
 const SEARCH_LIMIT = 20;
+const RECENT_LIMIT = 5;
 
 const nodeType = z.enum(["SPACE", "PAGE"]);
 
@@ -82,6 +83,38 @@ export const knowledgeRouter = createTRPCRouter({
       where: { userId: ctx.auth.user.id, type: "SPACE", archivedAt: null },
       orderBy: { title: "asc" },
     });
+  }),
+
+  listTree: protectedProcedure.query(async ({ ctx }) => {
+    return await prisma.node.findMany({
+      where: { userId: ctx.auth.user.id, archivedAt: null },
+      orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
+      select: { id: true, title: true, type: true, parentId: true },
+    });
+  }),
+
+  listRecent: protectedProcedure.query(async ({ ctx }) => {
+    return await prisma.node.findMany({
+      where: {
+        userId: ctx.auth.user.id,
+        archivedAt: null,
+        lastViewedAt: { not: null },
+      },
+      orderBy: { lastViewedAt: "desc" },
+      take: RECENT_LIMIT,
+      include: coverInclude,
+    });
+  }),
+
+  recordView: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
+    // Raw update so we only touch lastViewedAt — a Prisma update would also bump the @updatedAt column.
+    await prisma.$executeRaw`
+      UPDATE "Node"
+      SET "lastViewedAt" = NOW()
+      WHERE "id" = ${input.id} AND "userId" = ${ctx.auth.user.id}
+    `;
+
+    return { id: input.id };
   }),
 
   getAncestors: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
