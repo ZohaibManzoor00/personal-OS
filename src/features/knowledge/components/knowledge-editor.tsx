@@ -1,23 +1,12 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import {
-  CheckIcon,
-  ImageIcon,
-  Loader2Icon,
-  PencilIcon,
-  SparklesIcon,
-  TerminalIcon,
-} from "lucide-react";
+import { CheckIcon, ImageIcon, Loader2Icon, PencilIcon, SparklesIcon, TerminalIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Toggle } from "@/components/ui/toggle";
-import {
-  useKnowledgeNode,
-  usePolishMarkdown,
-  useUpdateNode,
-} from "../hooks/use-knowledge";
+import { useKnowledgeNode, usePolishMarkdown, useUpdateNode } from "../hooks/use-knowledge";
 import { useVimMode } from "../hooks/use-vim-mode";
 import { KnowledgeImageInsertDialog } from "./knowledge-image-insert-dialog";
 import { KnowledgeMarkdown } from "./knowledge-markdown";
@@ -27,8 +16,7 @@ import { MarkdownEditor, type MarkdownEditorHandle } from "./markdown-editor";
 const AUTOSAVE_DELAY = 800;
 const ACCEPTED_TYPES = ["png", "jpeg", "webp", "gif", "avif"];
 
-const isImageFile = (file: File) =>
-  ACCEPTED_TYPES.some((type) => file.type === `image/${type}`);
+const isImageFile = (file: File) => ACCEPTED_TYPES.some((type) => file.type === `image/${type}`);
 
 export const KnowledgeEditor = ({
   nodeId,
@@ -88,8 +76,7 @@ export const KnowledgeEditor = ({
     (files: FileList | File[]) => {
       const images = Array.from(files).filter(isImageFile);
       if (images.length === 0) return;
-      insertPosRef.current =
-        editorRef.current?.getSelectionHead() ?? content.length;
+      insertPosRef.current = editorRef.current?.getSelectionHead() ?? content.length;
       setPendingImages((prev) => [...prev, ...images]);
     },
     [content.length],
@@ -123,10 +110,7 @@ export const KnowledgeEditor = ({
   // The replacement is a single CodeMirror edit, so it can be undone (u / ⌘Z).
   const handlePolish = () => {
     if (polishMarkdown.isPending || !content.trim()) return;
-    polishMarkdown.mutate(
-      { text: content },
-      { onSuccess: (result) => setContent(result.markdown) },
-    );
+    polishMarkdown.mutate({ text: content }, { onSuccess: (result) => setContent(result.markdown) });
   };
 
   const enterEdit = () => setIsEditing(true);
@@ -135,32 +119,21 @@ export const KnowledgeEditor = ({
     setIsEditing(false);
   };
 
-  const status = updateNode.isPending
-    ? "Saving…"
-    : isDirty
-      ? "Unsaved changes"
-      : "Saved";
+  const status = updateNode.isPending ? "Saving…" : isDirty ? "Unsaved changes" : "Saved";
 
   return (
     <div className="flex h-full flex-col gap-6">
       <div ref={sentinelRef} className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
-          <h1 className="truncate font-heading text-2xl font-semibold tracking-tight">
-            {node.title}
-          </h1>
+          <h1 className="truncate font-heading text-2xl font-semibold tracking-tight">{node.title}</h1>
           <p className="text-xs text-muted-foreground">
             {isEditing ? (
               <span className="inline-flex items-center gap-1.5">
-                {updateNode.isPending && (
-                  <Loader2Icon className="size-3 animate-spin" />
-                )}
+                {updateNode.isPending && <Loader2Icon className="size-3 animate-spin" />}
                 {status}
               </span>
             ) : (
-              <>
-                Last updated{" "}
-                {formatDistanceToNow(node.updatedAt, { addSuffix: true })}
-              </>
+              <>Last updated {formatDistanceToNow(node.updatedAt, { addSuffix: true })}</>
             )}
           </p>
         </div>
@@ -168,12 +141,7 @@ export const KnowledgeEditor = ({
           {isEditing ? (
             <>
               <div className="mr-1 flex items-center gap-2 text-xs text-muted-foreground select-none">
-                <Switch
-                  size="sm"
-                  checked={autoSave}
-                  onCheckedChange={setAutoSave}
-                  aria-label="Toggle auto-save"
-                />
+                <Switch size="sm" checked={autoSave} onCheckedChange={setAutoSave} aria-label="Toggle auto-save" />
                 Auto-save
               </div>
               <Toggle
@@ -194,11 +162,7 @@ export const KnowledgeEditor = ({
                 disabled={polishMarkdown.isPending || !content.trim()}
                 title="Reformat as clean Markdown with AI"
               >
-                {polishMarkdown.isPending ? (
-                  <Loader2Icon className="size-4 animate-spin" />
-                ) : (
-                  <SparklesIcon className="size-4" />
-                )}
+                {polishMarkdown.isPending ? <Loader2Icon className="size-4 animate-spin" /> : <SparklesIcon className="size-4" />}
                 Format
               </Button>
               <Button variant="outline" size="sm" onClick={handlePickImage}>
@@ -206,12 +170,7 @@ export const KnowledgeEditor = ({
                 Image
               </Button>
               {!autoSave && isDirty && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSave}
-                  disabled={updateNode.isPending}
-                >
+                <Button variant="outline" size="sm" onClick={handleSave} disabled={updateNode.isPending}>
                   Save
                 </Button>
               )}
@@ -260,12 +219,7 @@ export const KnowledgeEditor = ({
         </button>
       )}
 
-      <KnowledgeImageInsertDialog
-        nodeId={nodeId}
-        file={pendingImages[0] ?? null}
-        onInsert={insertMarkdown}
-        onClose={closePendingImage}
-      />
+      <KnowledgeImageInsertDialog nodeId={nodeId} file={pendingImages[0] ?? null} onInsert={insertMarkdown} onClose={closePendingImage} />
     </div>
   );
 };

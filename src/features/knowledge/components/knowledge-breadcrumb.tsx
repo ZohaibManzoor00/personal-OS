@@ -31,11 +31,9 @@ export const KnowledgeBreadcrumb = ({ nodeId }: { nodeId: string }) => {
               <BreadcrumbSeparator />
               <BreadcrumbItem>
                 {isLast ? (
-                  <BreadcrumbPage className="max-w-40 truncate">
-                    {node.title}
-                  </BreadcrumbPage>
+                  <BreadcrumbPage>{node.title}</BreadcrumbPage>
                 ) : (
-                  <BreadcrumbLink asChild className="max-w-40 truncate">
+                  <BreadcrumbLink asChild>
                     <Link href={`/knowledge/${node.id}`}>{node.title}</Link>
                   </BreadcrumbLink>
                 )}

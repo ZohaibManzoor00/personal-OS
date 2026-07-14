@@ -4,11 +4,8 @@ import { useRouter } from "next/navigation";
 import { Suspense, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorView, LoadingView } from "@/components/entity-component";
-import {
-  useKnowledgeNode,
-  useRecordView,
-  useScrolledPast,
-} from "../hooks/use-knowledge";
+import { HeaderPortal } from "@/components/header-portal";
+import { useKnowledgeNode, useRecordView, useScrolledPast } from "../hooks/use-knowledge";
 import { KnowledgeBreadcrumb } from "./knowledge-breadcrumb";
 import { KnowledgeEditor } from "./knowledge-editor";
 import { KnowledgePageSearch } from "./knowledge-page-search";
@@ -23,22 +20,13 @@ export const KnowledgePageView = ({ nodeId }: { nodeId: string }) => {
 
   return (
     <div className="flex h-full flex-col gap-6">
-      <KnowledgeStickyHeader
-        nodeId={nodeId}
-        visible={scrolledPast}
-        search={search}
-        onSearchChange={setSearch}
-      />
-      <div className="flex items-start justify-between gap-4">
+      <KnowledgeStickyHeader nodeId={nodeId} visible={scrolledPast} search={search} onSearchChange={setSearch} />
+      <HeaderPortal>
         <div className="min-w-0 flex-1">
           <KnowledgeBreadcrumb nodeId={nodeId} />
         </div>
-        <KnowledgePageSearch
-          value={search}
-          onChange={setSearch}
-          className="w-64 shrink-0"
-        />
-      </div>
+        <KnowledgePageSearch value={search} onChange={setSearch} className="w-64 shrink-0" />
+      </HeaderPortal>
       <ErrorBoundary fallback={<ErrorView message="Error loading this page" />}>
         <Suspense fallback={<LoadingView message="Loading..." />}>
           <KnowledgePageContent nodeId={nodeId} headerRef={headerRef} />
@@ -48,26 +36,13 @@ export const KnowledgePageView = ({ nodeId }: { nodeId: string }) => {
   );
 };
 
-const KnowledgePageContent = ({
-  nodeId,
-  headerRef,
-}: {
-  nodeId: string;
-  headerRef?: React.Ref<HTMLDivElement>;
-}) => {
+const KnowledgePageContent = ({ nodeId, headerRef }: { nodeId: string; headerRef?: React.Ref<HTMLDivElement> }) => {
   const router = useRouter();
   const { data: node } = useKnowledgeNode(nodeId);
 
   useRecordView(nodeId);
 
-  const goToParent = () =>
-    router.push(node.parentId ? `/knowledge/${node.parentId}` : "/knowledge");
+  const goToParent = () => router.push(node.parentId ? `/knowledge/${node.parentId}` : "/knowledge");
 
-  return (
-    <KnowledgeEditor
-      nodeId={nodeId}
-      onDeleted={goToParent}
-      sentinelRef={headerRef}
-    />
-  );
+  return <KnowledgeEditor nodeId={nodeId} onDeleted={goToParent} sentinelRef={headerRef} />;
 };

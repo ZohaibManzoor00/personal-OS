@@ -100,15 +100,15 @@ export const KnowledgeStickyHeader = ({
           {node.title}
         </span>
 
+        <span className="ml-3 hidden shrink-0 text-xs text-muted-foreground lg:block">
+          Updated {formatDistanceToNow(node.updatedAt, { addSuffix: true })}
+        </span>
+
         <KnowledgePageSearch
           value={search}
           onChange={onSearchChange}
           className="ml-2 w-56 shrink-0"
         />
-
-        <span className="ml-3 hidden shrink-0 text-xs text-muted-foreground lg:block">
-          Updated {formatDistanceToNow(node.updatedAt, { addSuffix: true })}
-        </span>
 
         <div
           aria-hidden

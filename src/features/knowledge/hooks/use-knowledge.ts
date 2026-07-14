@@ -207,7 +207,7 @@ export const useRecordView = (id: string) => {
  * on-screen responds, so the shortcut always lands on the visible field.
  */
 export const useSearchFocusHotkey = (
-  ref: React.RefObject<HTMLInputElement | null>,
+  ref: RefObject<HTMLInputElement | null>,
 ) => {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

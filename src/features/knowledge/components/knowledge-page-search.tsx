@@ -11,9 +11,10 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { useKnowledgeSearch } from "../hooks/use-knowledge";
+import { useKnowledgeSearch, useSearchFocusHotkey } from "../hooks/use-knowledge";
 import { getCoverImage } from "../types";
 import { Highlighted, ResultBreadcrumbTitle } from "./knowledge-highlight";
+import { SearchKbd } from "./search-kbd";
 
 const SEARCH_DEBOUNCE = 250;
 
@@ -37,6 +38,9 @@ export const KnowledgePageSearch = ({
   const [focused, setFocused] = useState(false);
   const [deferred, setDeferred] = useState(value);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useSearchFocusHotkey(inputRef);
 
   useEffect(() => {
     const timer = setTimeout(() => setDeferred(value), SEARCH_DEBOUNCE);
@@ -64,7 +68,8 @@ export const KnowledgePageSearch = ({
       <div className="relative">
         <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
-          className="bg-background pr-8 pl-9"
+          ref={inputRef}
+          className="bg-background pr-12 pl-9"
           placeholder="Search knowledge"
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -76,17 +81,18 @@ export const KnowledgePageSearch = ({
             }
           }}
         />
-        <button
-          type="button"
-          aria-label="Clear search"
-          onClick={() => onChange("")}
-          className={cn(
-            "absolute top-1/2 right-2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground transition-opacity hover:text-foreground",
-            value ? "opacity-100" : "pointer-events-none opacity-0",
-          )}
-        >
-          <XIcon className="size-4" />
-        </button>
+        {value ? (
+          <button
+            type="button"
+            aria-label="Clear search"
+            onClick={() => onChange("")}
+            className="absolute top-1/2 right-2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <XIcon className="size-4" />
+          </button>
+        ) : (
+          <SearchKbd className="absolute top-1/2 right-2 -translate-y-1/2" />
+        )}
       </div>
 
       {open ? (
