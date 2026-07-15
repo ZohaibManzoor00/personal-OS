@@ -104,6 +104,7 @@ export const RouteCover = ({ route, title, description, actions, children, class
               <div className="flex min-w-0 flex-col">
                 {title && <h1 className="truncate font-heading text-2xl font-semibold tracking-tight md:text-3xl">{title}</h1>}
                 {description && <p className="text-sm text-muted-foreground">{description}</p>}
+                {/* {description && <></>} */}
               </div>
               {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
             </div>

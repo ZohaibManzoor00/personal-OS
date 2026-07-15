@@ -20,7 +20,7 @@ export const KnowledgeBreadcrumb = ({ nodeId }: { nodeId: string }) => {
       <BreadcrumbList>
         <BreadcrumbItem>
           <BreadcrumbLink asChild>
-            <Link href="/knowledge">Knowledge</Link>
+            <Link href="/learnings">Learnings</Link>
           </BreadcrumbLink>
         </BreadcrumbItem>
         {ancestors.map((node, index) => {
@@ -34,7 +34,7 @@ export const KnowledgeBreadcrumb = ({ nodeId }: { nodeId: string }) => {
                   <BreadcrumbPage>{node.title}</BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>
-                    <Link href={`/knowledge/${node.id}`}>{node.title}</Link>
+                    <Link href={`/learnings/${node.id}`}>{node.title}</Link>
                   </BreadcrumbLink>
                 )}
               </BreadcrumbItem>

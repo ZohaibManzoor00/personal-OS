@@ -33,7 +33,7 @@ export const KnowledgeSearch = ({ className }: { className?: string }) => {
         ref={inputRef}
         data-knowledge-search-input
         className="bg-background pr-12 pl-9"
-        placeholder="Search knowledge"
+        placeholder="Search learnings"
         value={value}
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={(event) => {

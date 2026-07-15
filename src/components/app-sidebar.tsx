@@ -110,9 +110,9 @@ const menuItems = [
         url: "/dashboard",
       },
       {
-        title: "Knowledge",
+        title: "Learnings",
         icon: BookIcon,
-        url: "/knowledge",
+        url: "/learnings",
       },
       {
         title: "Career",

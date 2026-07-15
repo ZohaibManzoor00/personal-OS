@@ -35,7 +35,7 @@ const KnowledgePageContent = ({ nodeId, headerRef }: { nodeId: string; headerRef
 
   useRecordView(nodeId);
 
-  const goToParent = () => router.push(node.parentId ? `/knowledge/${node.parentId}` : "/knowledge");
+  const goToParent = () => router.push(node.parentId ? `/learnings/${node.parentId}` : "/learnings");
 
   return <KnowledgeEditor nodeId={nodeId} onDeleted={goToParent} sentinelRef={headerRef} />;
 };

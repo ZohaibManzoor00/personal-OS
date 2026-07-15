@@ -7,13 +7,13 @@ export type DefaultCover = {
 };
 
 export const DEFAULT_COVERS: DefaultCover[] = [
-  { id: "aurora", label: "Aurora", src: "/covers/cover-aurora.png" },
   { id: "mountains", label: "Mountains", src: "/covers/cover-mountains.png" },
-  { id: "dunes", label: "Dunes", src: "/covers/cover-dunes.png" },
-  { id: "nebula", label: "Nebula", src: "/covers/cover-nebula.png" },
   { id: "forest", label: "Forest", src: "/covers/cover-forest.png" },
-  { id: "tide", label: "Tide", src: "/covers/cover-tide.png" },
-  { id: "ember", label: "Ember", src: "/covers/cover-ember.png" },
-  { id: "meadow", label: "Meadow", src: "/covers/cover-meadow.png" },
-  { id: "slate", label: "Slate", src: "/covers/cover-slate.png" },
+  { id: "lake", label: "Lake", src: "/covers/cover-lake.png" },
+  { id: "valley", label: "Valley", src: "/covers/cover-valley.png" },
+  { id: "blossom", label: "Blossom", src: "/covers/cover-blossom.png" },
+  { id: "coast", label: "Coast", src: "/covers/cover-coast.png" },
+  { id: "lavender", label: "Lavender", src: "/covers/cover-lavender.png" },
+  { id: "autumn", label: "Autumn", src: "/covers/cover-autumn.png" },
+  { id: "dunes", label: "Dunes", src: "/covers/cover-dunes.png" },
 ];

@@ -71,13 +71,13 @@ export const KnowledgeStickyHeader = ({
         <div className="mr-1 h-5 w-px shrink-0 bg-border" />
 
         <nav className="hidden min-w-0 shrink items-center gap-2 text-xs text-muted-foreground md:flex">
-          <Link href="/knowledge" className="shrink-0 hover:text-foreground">
-            Knowledge
+          <Link href="/learnings" className="shrink-0 hover:text-foreground">
+            Learnings
           </Link>
           {trail.map((ancestor) => (
             <Fragment key={ancestor.id}>
               <ChevronRightIcon className="size-3 shrink-0" />
-              <Link href={`/knowledge/${ancestor.id}`} className="max-w-32 truncate hover:text-foreground">
+              <Link href={`/learnings/${ancestor.id}`} className="max-w-32 truncate hover:text-foreground">
                 {ancestor.title}
               </Link>
             </Fragment>

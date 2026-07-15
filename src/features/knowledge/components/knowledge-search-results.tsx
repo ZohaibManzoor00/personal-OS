@@ -23,7 +23,7 @@ const SearchResultCard = ({
 
   return (
     <Link
-      href={`/knowledge/${node.id}`}
+      href={`/learnings/${node.id}`}
       prefetch
       data-search-result
       onKeyDown={onKeyDown}

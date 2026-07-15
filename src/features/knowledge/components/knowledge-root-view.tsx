@@ -44,8 +44,8 @@ export const KnowledgeRootView = () => {
       </HeaderPortal>
       <RouteCover
         route="knowledge"
-        title="Knowledge"
-        description="Your personal knowledge base"
+        title="Learnings"
+        description="A place to capture what I've learned."
         actions={
           <>
             <Button variant="outline" size="sm" onClick={handlers.onNewSpace}>
@@ -69,9 +69,9 @@ export const KnowledgeRootView = () => {
           </div>
 
           <ErrorBoundary
-            fallback={<ErrorView message="Error loading knowledge" />}
+            fallback={<ErrorView message="Error loading learnings" />}
           >
-            <Suspense fallback={<LoadingView message="Loading knowledge..." />}>
+            <Suspense fallback={<LoadingView message="Loading learnings..." />}>
               <KnowledgeRootContent {...handlers} />
             </Suspense>
           </ErrorBoundary>
@@ -86,7 +86,7 @@ export const KnowledgeRootView = () => {
         onOpenChange={(open) => setCreate((prev) => ({ ...prev, open }))}
         onCreated={(created) => {
           if (created.type === "PAGE")
-            router.push(`/knowledge/${created.id}?edit=1`);
+            router.push(`/learnings/${created.id}?edit=1`);
         }}
       />
     </div>
@@ -118,7 +118,7 @@ const KnowledgeRootContent = ({ onNewSpace, onNewPage }: CreateHandlers) => {
   if (items.length === 0) {
     return (
       <KnowledgeEmptyState
-        title="Start your knowledge base"
+        title="Start your learnings base"
         description="Create your first space to begin organizing everything you know."
         onNewSpace={onNewSpace}
         onNewPage={onNewPage}

@@ -43,7 +43,7 @@ export const KnowledgeTree = ({ nodes, rootId }: Props) => {
 
     const record: Record<string, TreeItemData> = {
       [ROOT_ID]: {
-        name: "Knowledge",
+        name: "Learnings",
         isFolder: true,
         children: childrenByParent.get(rootId) ?? [],
         count: 0,
@@ -69,7 +69,7 @@ export const KnowledgeTree = ({ nodes, rootId }: Props) => {
     getItemName: (item) => item.getItemData().name,
     isItemFolder: (item) => item.getItemData().isFolder,
     onPrimaryAction: (item) => {
-      if (!item.isFolder()) router.push(`/knowledge/${item.getId()}`);
+      if (!item.isFolder()) router.push(`/learnings/${item.getId()}`);
     },
     dataLoader: {
       getItem: (id) => items[id],
@@ -113,7 +113,7 @@ export const KnowledgeTree = ({ nodes, rootId }: Props) => {
               key={item.getId()}
               item={item}
               onDoubleClick={() => {
-                if (isFolder) router.push(`/knowledge/${item.getId()}`);
+                if (isFolder) router.push(`/learnings/${item.getId()}`);
               }}
             >
               <TreeItemLabel className="bg-transparent">

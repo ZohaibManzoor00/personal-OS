@@ -25,7 +25,7 @@ export const KnowledgeCard = ({ node }: { node: KnowledgeNode }) => {
       className="group/card relative h-full gap-0 p-0 py-0! transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
     >
       <Link
-        href={`/knowledge/${node.id}`}
+        href={`/learnings/${node.id}`}
         prefetch
         aria-label={node.title}
         className="absolute inset-0 rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

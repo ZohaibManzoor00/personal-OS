@@ -13,7 +13,7 @@ import { SearchKbd } from "./search-kbd";
 const SEARCH_DEBOUNCE = 250;
 
 /**
- * Compact knowledge search for the page (`/knowledge/[id]`) top bar. Shows hits
+ * Compact knowledge search for the page (`/learnings/[id]`) top bar. Shows hits
  * in a dropdown anchored under the input instead of replacing the page. The
  * query is controlled by the parent so the same value is shared between the
  * inline (top of page) and sticky-header placements.
@@ -64,7 +64,7 @@ export const KnowledgePageSearch = ({
         <Input
           ref={inputRef}
           className="bg-background pr-12 pl-9"
-          placeholder="Search knowledge"
+          placeholder="Search learnings"
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onFocus={() => setFocused(true)}
@@ -110,7 +110,7 @@ export const KnowledgePageSearch = ({
               return (
                 <Link
                   key={node.id}
-                  href={`/knowledge/${node.id}`}
+                  href={`/learnings/${node.id}`}
                   prefetch
                   onClick={() => setFocused(false)}
                   className="flex items-start gap-2.5 rounded-md px-2.5 py-2 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"

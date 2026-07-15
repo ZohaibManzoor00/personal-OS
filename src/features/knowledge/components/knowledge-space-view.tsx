@@ -37,7 +37,7 @@ export const KnowledgeSpaceView = ({ nodeId }: { nodeId: string }) => {
     onNewPage: () => openCreate("PAGE"),
   };
 
-  const goToParent = () => router.push(node.parentId ? `/knowledge/${node.parentId}` : "/knowledge");
+  const goToParent = () => router.push(node.parentId ? `/learnings/${node.parentId}` : "/learnings");
 
   return (
     <div className="flex flex-col gap-8">
@@ -57,7 +57,7 @@ export const KnowledgeSpaceView = ({ nodeId }: { nodeId: string }) => {
         open={create.open}
         onOpenChange={(open) => setCreate((prev) => ({ ...prev, open }))}
         onCreated={(created) => {
-          if (created.type === "PAGE") router.push(`/knowledge/${created.id}?edit=1`);
+          if (created.type === "PAGE") router.push(`/learnings/${created.id}?edit=1`);
         }}
       />
     </div>
