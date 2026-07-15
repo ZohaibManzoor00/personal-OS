@@ -60,8 +60,8 @@ export const RouteCover = ({ route, title, description, actions, children, class
 
       {/* Hover controls, pinned to the top-right of the centered content column
           so they sit in the strip above the title/actions row. */}
-      <div className="pointer-events-none absolute inset-x-0 top-3 z-20 mx-auto flex max-w-7xl justify-end px-4 md:px-10">
-        <div className="pointer-events-auto flex gap-1.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/cover:opacity-100">
+      <div className="pointer-events-none absolute inset-x-0 top-3 z-20 px-4 md:px-10">
+        <div className="pointer-events-auto mx-auto flex max-w-7xl justify-end gap-1.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/cover:opacity-100">
           <Button
             type="button"
             size="sm"
@@ -97,17 +97,19 @@ export const RouteCover = ({ route, title, description, actions, children, class
 
       {/* Overlaid content, aligned to the centered page column. The top padding
           leaves room for the hover controls strip so nothing overlaps. */}
-      <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pt-8 pb-16 md:px-10 md:pb-24">
-        {(title || actions) && (
-          <div className="flex flex-row items-end justify-between gap-x-4">
-            <div className="flex min-w-0 flex-col">
-              {title && <h1 className="truncate font-heading text-2xl font-semibold tracking-tight md:text-3xl">{title}</h1>}
-              {description && <p className="text-sm text-muted-foreground">{description}</p>}
+      <div className="relative z-10 px-4 pt-8 pb-16 md:px-10 md:pb-24">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+          {(title || actions) && (
+            <div className="flex flex-row items-end justify-between gap-x-4">
+              <div className="flex min-w-0 flex-col">
+                {title && <h1 className="truncate font-heading text-2xl font-semibold tracking-tight md:text-3xl">{title}</h1>}
+                {description && <p className="text-sm text-muted-foreground">{description}</p>}
+              </div>
+              {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
             </div>
-            {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
-          </div>
-        )}
-        {children}
+          )}
+          {children}
+        </div>
       </div>
 
       <RouteCoverDialog

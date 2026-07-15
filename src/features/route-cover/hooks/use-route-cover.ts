@@ -13,21 +13,17 @@ export const useRouteCover = (route: RouteCoverKey) => {
 
   const query = useQuery(trpc.routeCover.get.queryOptions({ route }));
 
-  const createUploadUrl = useMutation(
-    trpc.routeCover.createUploadUrl.mutationOptions(),
-  );
+  const createUploadUrl = useMutation(trpc.routeCover.createUploadUrl.mutationOptions());
   const attach = useMutation(trpc.routeCover.attach.mutationOptions());
   const removeCover = useMutation(
     trpc.routeCover.remove.mutationOptions({
-      onError: (error) =>
-        toast.error(`Failed to remove cover: ${error.message}`),
+      onError: (error) => toast.error(`Failed to remove cover: ${error.message}`),
     }),
   );
 
   const [isUploading, setIsUploading] = useState(false);
 
-  const invalidate = () =>
-    queryClient.invalidateQueries(trpc.routeCover.get.queryFilter({ route }));
+  const invalidate = () => queryClient.invalidateQueries(trpc.routeCover.get.queryFilter({ route }));
 
   const uploadFile = async (raw: File): Promise<boolean> => {
     setIsUploading(true);
@@ -57,9 +53,7 @@ export const useRouteCover = (route: RouteCoverKey) => {
       invalidate();
       return true;
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to upload cover",
-      );
+      toast.error(error instanceof Error ? error.message : "Failed to upload cover");
       return false;
     } finally {
       setIsUploading(false);
@@ -80,9 +74,7 @@ export const useRouteCover = (route: RouteCoverKey) => {
       // uploadFile toggles isUploading itself; it's fine to overlap.
       return await uploadFile(file);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to apply cover",
-      );
+      toast.error(error instanceof Error ? error.message : "Failed to apply cover");
       return false;
     } finally {
       setIsUploading(false);
