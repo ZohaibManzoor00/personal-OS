@@ -364,10 +364,13 @@ export const knowledgeRouter = createTRPCRouter({
         ts_headline('english', coalesce("body", ''), to_tsquery('english', ${tsquery}), ${snippetHeadlineOpts}) AS "snippet"
       FROM "Node"
       WHERE "userId" = ${ctx.auth.user.id}
-        AND "section" = ${input.section}
         AND "archivedAt" IS NULL
         AND "searchVector" @@ to_tsquery('english', ${tsquery})
       ORDER BY
+        -- Hits in the section you're currently browsing always rank above the
+        -- rest, then relevance (proximity/density + a recency boost) decides the
+        -- order within each group.
+        ("section" = ${input.section}) DESC,
         ts_rank_cd("searchVector", to_tsquery('english', ${tsquery}))
           + 0.3 * exp(-EXTRACT(EPOCH FROM (NOW() - COALESCE("lastViewedAt", "updatedAt"))) / (86400.0 * 30.0)) DESC,
         "updatedAt" DESC

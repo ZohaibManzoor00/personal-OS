@@ -7,6 +7,8 @@ import { useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useKnowledgeSearch } from "../hooks/use-knowledge";
+import { groupSearchResultsBySection } from "../lib/group-results";
+import { resolveSectionBasePath } from "../lib/sections";
 import { getCoverImage, type KnowledgeSearchResult } from "../types";
 import { Highlighted, ResultBreadcrumbTitle } from "./knowledge-highlight";
 import { useKnowledgeSection } from "./knowledge-section-context";
@@ -18,14 +20,13 @@ const SearchResultCard = ({
   node: KnowledgeSearchResult;
   onKeyDown: React.KeyboardEventHandler<HTMLAnchorElement>;
 }) => {
-  const section = useKnowledgeSection();
   const Icon = node.type === "SPACE" ? FolderIcon : FileTextIcon;
   const cover = getCoverImage(node);
   const usedAt = node.lastViewedAt ?? node.updatedAt;
 
   return (
     <Link
-      href={`${section.basePath}/${node.id}`}
+      href={`${resolveSectionBasePath(node.section)}/${node.id}`}
       prefetch
       data-search-result
       onKeyDown={onKeyDown}
@@ -66,6 +67,7 @@ const SearchResultCard = ({
 };
 
 export const KnowledgeSearchResults = ({ query }: { query: string }) => {
+  const section = useKnowledgeSection();
   const { data, isLoading } = useKnowledgeSearch(query);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -107,10 +109,23 @@ export const KnowledgeSearchResults = ({ query }: { query: string }) => {
     return <div className="py-16 text-center text-sm text-muted-foreground">No results for "{query}"</div>;
   }
 
+  const groups = groupSearchResultsBySection(data, section.section);
+  const showHeadings = groups.length > 1;
+
   return (
-    <div ref={containerRef} className="flex flex-col gap-2">
-      {data.map((node) => (
-        <SearchResultCard key={node.id} node={node} onKeyDown={handleKeyDown} />
+    <div ref={containerRef} className="flex flex-col gap-6">
+      {groups.map((group) => (
+        <div key={group.section} className="flex flex-col gap-2">
+          {showHeadings && (
+            <h3 className="px-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {group.label}
+              {group.section === section.section && <span className="ml-1.5 normal-case text-muted-foreground/60">· current</span>}
+            </h3>
+          )}
+          {group.results.map((node) => (
+            <SearchResultCard key={node.id} node={node} onKeyDown={handleKeyDown} />
+          ))}
+        </div>
       ))}
     </div>
   );

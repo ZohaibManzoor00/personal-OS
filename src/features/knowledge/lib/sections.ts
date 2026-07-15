@@ -102,3 +102,17 @@ export const KNOWLEDGE_SECTION_CONFIG: Record<KnowledgeSection, KnowledgeSection
 
 export const getKnowledgeSectionConfig = (section: KnowledgeSection): KnowledgeSectionConfig =>
   KNOWLEDGE_SECTION_CONFIG[section];
+
+/**
+ * Resolve a config from a raw `section` string (e.g. a node's stored section,
+ * which is typed as `string`). Falls back to Learnings for any unknown value so
+ * links/labels never break.
+ */
+export const resolveKnowledgeSectionConfig = (section: string): KnowledgeSectionConfig =>
+  isKnowledgeSection(section) ? KNOWLEDGE_SECTION_CONFIG[section] : KNOWLEDGE_SECTION_CONFIG.learnings;
+
+/** Base path for a raw section string, e.g. "career" → "/career". */
+export const resolveSectionBasePath = (section: string): string => resolveKnowledgeSectionConfig(section).basePath;
+
+/** Display label for a raw section string, e.g. "career" → "Career". */
+export const resolveSectionLabel = (section: string): string => resolveKnowledgeSectionConfig(section).label;

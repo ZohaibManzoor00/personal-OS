@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useKnowledgeSearch, useSearchFocusHotkey } from "../hooks/use-knowledge";
+import { groupSearchResultsBySection } from "../lib/group-results";
+import { resolveSectionBasePath } from "../lib/sections";
 import { getCoverImage } from "../types";
 import { Highlighted, ResultBreadcrumbTitle } from "./knowledge-highlight";
 import { useKnowledgeSection } from "./knowledge-section-context";
@@ -46,6 +48,9 @@ export const KnowledgePageSearch = ({
   const query = deferred.trim();
   const { data, isLoading } = useKnowledgeSearch(query);
   const open = focused && query.length > 0;
+
+  const groups = data ? groupSearchResultsBySection(data, section.section) : [];
+  const showHeadings = groups.length > 1;
 
   // Close when clicking/tapping outside the search.
   useEffect(() => {
@@ -105,44 +110,54 @@ export const KnowledgePageSearch = ({
           ) : !data || data.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">No results for "{query}"</div>
           ) : (
-            data.map((node) => {
-              const Icon = node.type === "SPACE" ? FolderIcon : FileTextIcon;
-              const cover = getCoverImage(node);
-
-              return (
-                <Link
-                  key={node.id}
-                  href={`${section.basePath}/${node.id}`}
-                  prefetch
-                  onClick={() => setFocused(false)}
-                  className="flex items-start gap-2.5 rounded-md px-2.5 py-2 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
-                >
-                  {cover ? (
-                    // biome-ignore lint/performance/noImgElement: R2 public asset, no next/image domain config
-                    <img
-                      src={cover.url}
-                      alt={cover.altText ?? node.title}
-                      className="size-8 shrink-0 rounded-md object-cover ring-1 ring-border"
-                    />
-                  ) : (
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                      <Icon className="size-4" />
-                    </div>
-                  )}
-
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <ResultBreadcrumbTitle breadcrumb={node.breadcrumb} titleHighlight={node.titleHighlight} />
-                    {node.snippet ? (
-                      <span className="line-clamp-1 text-xs text-muted-foreground">
-                        <Highlighted value={node.snippet} />
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground/70">{node.type === "SPACE" ? "Space" : "Page"}</span>
-                    )}
+            groups.map((group) => (
+              <div key={group.section} className="flex flex-col">
+                {showHeadings && (
+                  <div className="flex items-center gap-1.5 px-2.5 pt-2 pb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {group.label}
+                    {group.section === section.section && <span className="normal-case text-muted-foreground/60">· current</span>}
                   </div>
-                </Link>
-              );
-            })
+                )}
+                {group.results.map((node) => {
+                  const Icon = node.type === "SPACE" ? FolderIcon : FileTextIcon;
+                  const cover = getCoverImage(node);
+
+                  return (
+                    <Link
+                      key={node.id}
+                      href={`${resolveSectionBasePath(node.section)}/${node.id}`}
+                      prefetch
+                      onClick={() => setFocused(false)}
+                      className="flex items-start gap-2.5 rounded-md px-2.5 py-2 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+                    >
+                      {cover ? (
+                        // biome-ignore lint/performance/noImgElement: R2 public asset, no next/image domain config
+                        <img
+                          src={cover.url}
+                          alt={cover.altText ?? node.title}
+                          className="size-8 shrink-0 rounded-md object-cover ring-1 ring-border"
+                        />
+                      ) : (
+                        <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                          <Icon className="size-4" />
+                        </div>
+                      )}
+
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <ResultBreadcrumbTitle breadcrumb={node.breadcrumb} titleHighlight={node.titleHighlight} />
+                        {node.snippet ? (
+                          <span className="line-clamp-1 text-xs text-muted-foreground">
+                            <Highlighted value={node.snippet} />
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground/70">{node.type === "SPACE" ? "Space" : "Page"}</span>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            ))
           )}
         </div>
       ) : null}
