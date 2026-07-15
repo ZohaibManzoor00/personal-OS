@@ -83,7 +83,7 @@ export const dashboardRouter = createTRPCRouter({
           row_number() OVER (
             PARTITION BY "section"
             ORDER BY COALESCE("lastViewedAt", "updatedAt") DESC
-          ) AS "rn"
+          )::int AS "rn"
         FROM "Node"
         WHERE "userId" = ${ctx.auth.user.id} AND "archivedAt" IS NULL
       ) ranked
