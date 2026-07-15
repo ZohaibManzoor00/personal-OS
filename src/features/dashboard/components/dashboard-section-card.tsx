@@ -42,8 +42,11 @@ export const DashboardSectionCard = ({
         ) : (
           <div className="absolute inset-0 bg-linear-to-br from-primary/30 via-muted to-accent" />
         )}
-        {/* Fade the image into the card so the label sits on a legible base. */}
-        <div className="absolute inset-0 bg-linear-to-t from-card via-card/40 to-transparent" />
+        {/* Match the page cover treatment: a light scrim keeps the image crisp
+            instead of washing it out, with the fade concentrated at the bottom
+            so the label still sits on a legible base. */}
+        <div className="absolute inset-0 bg-background/25" />
+        <div className="absolute inset-x-0 bottom-0 h-4 bg-linear-to-t from-card via-card/40 to-transparent" />
         <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 p-3">
           <div className="flex items-center gap-2">
             <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-background/80 text-foreground ring-1 ring-border backdrop-blur-sm">
