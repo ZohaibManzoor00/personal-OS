@@ -3,19 +3,32 @@
 import { formatDistanceToNow } from "date-fns";
 import { FileTextIcon, FolderIcon, Loader2Icon } from "lucide-react";
 import Link from "next/link";
+import { useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useKnowledgeSearch } from "../hooks/use-knowledge";
 import { getCoverImage, type KnowledgeSearchResult } from "../types";
 import { Highlighted, ResultBreadcrumbTitle } from "./knowledge-highlight";
 
-const SearchResultCard = ({ node }: { node: KnowledgeSearchResult }) => {
+const SearchResultCard = ({
+  node,
+  onKeyDown,
+}: {
+  node: KnowledgeSearchResult;
+  onKeyDown: React.KeyboardEventHandler<HTMLAnchorElement>;
+}) => {
   const Icon = node.type === "SPACE" ? FolderIcon : FileTextIcon;
   const cover = getCoverImage(node);
   const usedAt = node.lastViewedAt ?? node.updatedAt;
 
   return (
-    <Link href={`/knowledge/${node.id}`} prefetch className="focus-visible:outline-none">
+    <Link
+      href={`/knowledge/${node.id}`}
+      prefetch
+      data-search-result
+      onKeyDown={onKeyDown}
+      className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
       <Card
         size="sm"
         className={cn(
@@ -55,6 +68,39 @@ const SearchResultCard = ({ node }: { node: KnowledgeSearchResult }) => {
 
 export const KnowledgeSearchResults = ({ query }: { query: string }) => {
   const { data, isLoading } = useKnowledgeSearch(query);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Keep Tab / Shift+Tab moving strictly between result items. Tabbing past the
+  // last item (or Shift+Tab before the first) falls back to the normal focus
+  // order, with the first item returning focus to the search input.
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLAnchorElement>) => {
+    if (event.key !== "Tab") return;
+
+    const items = Array.from(
+      containerRef.current?.querySelectorAll<HTMLElement>(
+        "[data-search-result]",
+      ) ?? [],
+    );
+    const index = items.indexOf(document.activeElement as HTMLElement);
+    if (index === -1) return;
+
+    if (event.shiftKey) {
+      event.preventDefault();
+      if (index === 0) {
+        document
+          .querySelector<HTMLElement>("[data-knowledge-search-input]")
+          ?.focus();
+      } else {
+        items[index - 1]?.focus();
+      }
+      return;
+    }
+
+    if (index < items.length - 1) {
+      event.preventDefault();
+      items[index + 1]?.focus();
+    }
+  };
 
   if (isLoading) {
     return (
@@ -69,9 +115,9 @@ export const KnowledgeSearchResults = ({ query }: { query: string }) => {
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div ref={containerRef} className="flex flex-col gap-2">
       {data.map((node) => (
-        <SearchResultCard key={node.id} node={node} />
+        <SearchResultCard key={node.id} node={node} onKeyDown={handleKeyDown} />
       ))}
     </div>
   );

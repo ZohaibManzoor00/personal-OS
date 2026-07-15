@@ -30,10 +30,21 @@ export const KnowledgeSearch = () => {
       <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         ref={inputRef}
+        data-knowledge-search-input
         className="bg-background pr-12 pl-9"
         placeholder="Search knowledge"
         value={value}
         onChange={(event) => setValue(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key !== "Tab" || event.shiftKey) return;
+          const first = document.querySelector<HTMLElement>(
+            "[data-search-result]",
+          );
+          if (first) {
+            event.preventDefault();
+            first.focus();
+          }
+        }}
       />
       {value ? (
         <button
