@@ -34,11 +34,7 @@ export const KnowledgeCard = ({ node }: { node: KnowledgeNode }) => {
       <div className="pointer-events-none relative flex aspect-video w-full items-center justify-center overflow-hidden border-b bg-muted">
         {cover ? (
           // biome-ignore lint/performance/noImgElement: R2 public asset, no next/image domain config
-          <img
-            src={cover.url}
-            alt={cover.altText ?? node.title}
-            className="size-full object-contain"
-          />
+          <img src={cover.url} alt={cover.altText ?? node.title} className="size-full object-contain" />
         ) : hasPreview ? (
           <div className="pointer-events-none absolute inset-0 overflow-hidden bg-card">
             <div className="w-[200%] origin-top-left scale-50 p-4">
@@ -58,19 +54,10 @@ export const KnowledgeCard = ({ node }: { node: KnowledgeNode }) => {
 
       <div className="flex flex-col gap-0.5 px-3 pb-3">
         <div className="flex items-center justify-between gap-2">
-          <p className="truncate font-heading text-sm font-medium leading-snug">
-            {node.title}
-          </p>
-          <Icon
-            className={cn(
-              "size-3.5 shrink-0",
-              isSpace ? "text-muted-foreground" : "text-blue-500",
-            )}
-          />
+          <p className="truncate font-heading text-sm font-medium leading-snug">{node.title}</p>
+          <Icon className={cn("size-3.5 shrink-0", isSpace ? "text-muted-foreground" : "text-blue-500")} />
         </div>
-        <p className="truncate text-xs text-muted-foreground">
-          {formatDistanceToNow(node.updatedAt, { addSuffix: true })}
-        </p>
+        <p className="truncate text-xs text-muted-foreground">{formatDistanceToNow(node.updatedAt, { addSuffix: true })}</p>
       </div>
     </Card>
   );

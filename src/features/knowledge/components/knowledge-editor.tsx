@@ -36,8 +36,6 @@ export const KnowledgeEditor = ({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  // A freshly created page navigates here with `?edit=1` so it opens straight
-  // into the editor, focused and ready to type.
   const [isEditing, setIsEditing] = useState(() => searchParams.get("edit") === "1");
   const [autoSave, setAutoSave] = useState(false);
   const [vimMode, setVimMode] = useVimMode();

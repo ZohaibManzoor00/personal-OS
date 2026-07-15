@@ -2,14 +2,7 @@
 
 import { FilePlusIcon, FolderPlusIcon, LibraryIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 
 type Props = {
   title: string;
@@ -18,12 +11,7 @@ type Props = {
   onNewPage: () => void;
 };
 
-export const KnowledgeEmptyState = ({
-  title,
-  description,
-  onNewSpace,
-  onNewPage,
-}: Props) => {
+export const KnowledgeEmptyState = ({ title, description, onNewSpace, onNewPage }: Props) => {
   return (
     <Empty className="border border-dashed bg-card/40">
       <EmptyHeader>

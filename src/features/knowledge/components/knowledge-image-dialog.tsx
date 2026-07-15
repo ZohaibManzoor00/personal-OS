@@ -3,14 +3,7 @@
 import { ImageIcon, Loader2Icon, UploadIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useNodeImage } from "../hooks/use-knowledge";
 import { type Area, cropImageToFile } from "../lib/crop-image";
 import { getCoverImage, type KnowledgeNode } from "../types";
@@ -81,27 +74,16 @@ export const KnowledgeImageDialog = ({ node, open, onOpenChange }: Props) => {
           <DialogDescription>
             {pending
               ? "The whole image is selected by default. Drag any edge or corner to crop, or pick a ratio to lock it."
-              : `Add an image to make this ${
-                  node.type === "SPACE" ? "space" : "page"
-                } stand out on its card.`}
+              : `Add an image to make this ${node.type === "SPACE" ? "space" : "page"} stand out on its card.`}
           </DialogDescription>
         </DialogHeader>
 
         {pending ? (
-          <ImageCropper
-            src={pending.src}
-            alt={pending.name}
-            disabled={isUploading}
-            onAreaChange={setArea}
-          />
+          <ImageCropper src={pending.src} alt={pending.name} disabled={isUploading} onAreaChange={setArea} />
         ) : cover ? (
           <div className="flex aspect-video w-full items-center justify-center overflow-hidden rounded-xl border bg-muted/40">
             {/* biome-ignore lint/performance/noImgElement: R2 public asset, no next/image domain config */}
-            <img
-              src={cover.url}
-              alt={cover.altText ?? node.title}
-              className="size-full object-cover"
-            />
+            <img src={cover.url} alt={cover.altText ?? node.title} className="size-full object-cover" />
           </div>
         ) : (
           <button
@@ -115,31 +97,15 @@ export const KnowledgeImageDialog = ({ node, open, onOpenChange }: Props) => {
           </button>
         )}
 
-        <input
-          ref={inputRef}
-          type="file"
-          accept={ACCEPTED_TYPES}
-          className="hidden"
-          onChange={handleSelect}
-        />
+        <input ref={inputRef} type="file" accept={ACCEPTED_TYPES} className="hidden" onChange={handleSelect} />
 
         <DialogFooter>
           {pending ? (
             <>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={clearPending}
-                disabled={isUploading}
-                className="mr-auto"
-              >
+              <Button type="button" variant="outline" onClick={clearPending} disabled={isUploading} className="mr-auto">
                 Cancel
               </Button>
-              <Button
-                type="button"
-                onClick={handleSave}
-                disabled={isUploading || !area}
-              >
+              <Button type="button" onClick={handleSave} disabled={isUploading || !area}>
                 {isUploading ? (
                   <>
                     <Loader2Icon className="size-4 animate-spin" />
@@ -153,33 +119,17 @@ export const KnowledgeImageDialog = ({ node, open, onOpenChange }: Props) => {
           ) : (
             <>
               {cover && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => remove()}
-                  disabled={isBusy}
-                  className="mr-auto"
-                >
+                <Button type="button" variant="outline" onClick={() => remove()} disabled={isBusy} className="mr-auto">
                   {isRemoving ? "Removing..." : "Remove"}
                 </Button>
               )}
               {cover && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => inputRef.current?.click()}
-                  disabled={isBusy}
-                >
+                <Button type="button" variant="outline" onClick={() => inputRef.current?.click()} disabled={isBusy}>
                   <UploadIcon className="size-4" />
                   Replace
                 </Button>
               )}
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => onOpenChange(false)}
-                disabled={isBusy}
-              >
+              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={isBusy}>
                 Done
               </Button>
             </>

@@ -6,8 +6,6 @@ import "react-image-crop/dist/ReactCrop.css";
 import { Button } from "@/components/ui/button";
 import { type Area, fullImageCrop, percentCropToArea } from "../lib/crop-image";
 
-// `undefined` = free-form crop (drag any edge or corner independently).
-// `"original"` locks to the image's natural ratio; a number locks to that ratio.
 const ASPECTS = [
   { id: "free", label: "Free", value: undefined },
   { id: "original", label: "OG", value: "original" },
@@ -19,11 +17,6 @@ const ASPECTS = [
 
 type AspectOption = (typeof ASPECTS)[number]["value"];
 
-/**
- * Whole-image cropper with aspect presets. Starts with the entire image
- * selected (no distortion) and lets the user drag any edge or corner, or lock
- * a ratio. Reports the selection back in source-image pixel coordinates.
- */
 export const ImageCropper = ({
   src,
   alt,
@@ -39,7 +32,6 @@ export const ImageCropper = ({
   const [crop, setCrop] = useState<Crop>();
   const naturalRef = useRef<{ width: number; height: number } | null>(null);
 
-  // A new image starts fresh in free-form mode.
   useEffect(() => {
     setSelected(undefined);
     setCrop(undefined);
@@ -65,7 +57,6 @@ export const ImageCropper = ({
   const onImageLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
     const { naturalWidth, naturalHeight, width, height } = event.currentTarget;
     naturalRef.current = { width: naturalWidth, height: naturalHeight };
-    // Start with the entire image selected so nothing is cropped by default.
     const initial = fullImageCrop(resolveAspect(selected), width, height);
     setCrop(initial);
     report(initial);

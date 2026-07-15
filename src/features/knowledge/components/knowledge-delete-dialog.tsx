@@ -20,12 +20,7 @@ type Props = {
   onDeleted?: () => void;
 };
 
-export const KnowledgeDeleteDialog = ({
-  node,
-  open,
-  onOpenChange,
-  onDeleted,
-}: Props) => {
+export const KnowledgeDeleteDialog = ({ node, open, onOpenChange, onDeleted }: Props) => {
   const deleteNode = useDeleteNode();
 
   const handleDelete = () => {
@@ -52,14 +47,8 @@ export const KnowledgeDeleteDialog = ({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={deleteNode.isPending}>
-            Cancel
-          </AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            onClick={handleDelete}
-            disabled={deleteNode.isPending}
-          >
+          <AlertDialogCancel disabled={deleteNode.isPending}>Cancel</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={handleDelete} disabled={deleteNode.isPending}>
             Delete
           </AlertDialogAction>
         </AlertDialogFooter>

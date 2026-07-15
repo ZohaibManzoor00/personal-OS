@@ -15,11 +15,7 @@ export const KnowledgeCollection = ({ parentId, items }: Props) => {
   const treeQuery = useKnowledgeTree(view === "tree");
 
   if (view === "tree") {
-    if (!treeQuery.data) {
-      return (
-        <p className="px-1 text-sm text-muted-foreground">Loading tree...</p>
-      );
-    }
+    if (!treeQuery.data) return <p className="px-1 text-sm text-muted-foreground">Loading tree...</p>;
     return <KnowledgeTree nodes={treeQuery.data} rootId={parentId} />;
   }
 
