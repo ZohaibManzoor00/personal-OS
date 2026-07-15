@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Suspense, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorView, LoadingView } from "@/components/entity-component";
@@ -19,6 +20,7 @@ type CreateHandlers = {
 };
 
 export const KnowledgeRootView = () => {
+  const router = useRouter();
   const [create, setCreate] = useState<{
     open: boolean;
     type: "SPACE" | "PAGE";
@@ -57,6 +59,10 @@ export const KnowledgeRootView = () => {
         parentId={null}
         open={create.open}
         onOpenChange={(open) => setCreate((prev) => ({ ...prev, open }))}
+        onCreated={(created) => {
+          if (created.type === "PAGE")
+            router.push(`/knowledge/${created.id}?edit=1`);
+        }}
       />
     </div>
   );

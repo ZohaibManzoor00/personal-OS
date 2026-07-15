@@ -2,6 +2,7 @@
 
 import { formatDistanceToNow } from "date-fns";
 import { CheckIcon, ImageIcon, Loader2Icon, PencilIcon, SparklesIcon, TerminalIcon } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -31,13 +32,27 @@ export const KnowledgeEditor = ({
   const updateNode = useUpdateNode();
   const polishMarkdown = usePolishMarkdown();
 
-  const [isEditing, setIsEditing] = useState(false);
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // A freshly created page navigates here with `?edit=1` so it opens straight
+  // into the editor, focused and ready to type.
+  const [isEditing, setIsEditing] = useState(() => searchParams.get("edit") === "1");
   const [autoSave, setAutoSave] = useState(false);
   const [vimMode, setVimMode] = useVimMode();
   const [content, setContent] = useState(node.body ?? "");
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const editorRef = useRef<MarkdownEditorHandle>(null);
   const insertPosRef = useRef<number | null>(null);
+
+  // Drop the `?edit=1` hint from the URL once consumed so a refresh or back/
+  // forward navigation doesn't force edit mode again.
+  useEffect(() => {
+    if (searchParams.get("edit") === "1") {
+      router.replace(pathname, { scroll: false });
+    }
+  }, [searchParams, router, pathname]);
 
   // Only pull server content into the editor while viewing, so an in-flight
   // autosave refetch can never clobber characters typed while editing.
@@ -203,6 +218,7 @@ export const KnowledgeEditor = ({
           value={content}
           onChange={setContent}
           vimMode={vimMode}
+          autoFocus
           isImageFile={isImageFile}
           onImageFiles={handleFiles}
           placeholder="Start writing in Markdown… paste or drop images to embed them."

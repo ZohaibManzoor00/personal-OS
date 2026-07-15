@@ -67,7 +67,8 @@ export const KnowledgeSpaceView = ({ nodeId }: { nodeId: string }) => {
         open={create.open}
         onOpenChange={(open) => setCreate((prev) => ({ ...prev, open }))}
         onCreated={(created) => {
-          if (created.type === "PAGE") router.push(`/knowledge/${created.id}`);
+          if (created.type === "PAGE")
+            router.push(`/knowledge/${created.id}?edit=1`);
         }}
       />
     </div>

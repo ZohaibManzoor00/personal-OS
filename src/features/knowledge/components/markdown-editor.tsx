@@ -85,6 +85,7 @@ export const MarkdownEditor = forwardRef<
     vimMode?: boolean;
     placeholder?: string;
     className?: string;
+    autoFocus?: boolean;
     isImageFile?: (file: File) => boolean;
     onImageFiles?: (files: File[]) => void;
   }
@@ -95,6 +96,7 @@ export const MarkdownEditor = forwardRef<
     vimMode = false,
     placeholder: placeholderText,
     className,
+    autoFocus,
     isImageFile,
     onImageFiles,
   },
@@ -139,6 +141,7 @@ export const MarkdownEditor = forwardRef<
       value={value}
       onChange={onChange}
       extensions={extensions}
+      autoFocus={autoFocus}
       theme="none"
       basicSetup={{
         lineNumbers: false,
