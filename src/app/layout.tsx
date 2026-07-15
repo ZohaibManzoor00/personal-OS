@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
+import { Geist, Geist_Mono, Inter, JetBrains_Mono, Outfit } from "next/font/google";
 import { cookies } from "next/headers";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { ActiveThemeProvider } from "@/components/active-theme";
@@ -15,6 +15,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+// Loaded so the "Teenage Lobster" color theme can switch the UI to JetBrains Mono.
+const jetbrainsMono = JetBrains_Mono({ variable: "--font-jetbrains-mono", subsets: ["latin"] });
+// Loaded so the "Claude" color theme can switch the UI to Outfit.
+const outfit = Outfit({ variable: "--font-outfit", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: { default: "Zo's Journey", template: "%s | Zo" },
@@ -38,6 +42,8 @@ export default async function RootLayout({
           "antialiased",
           geistSans.variable,
           geistMono.variable,
+          jetbrainsMono.variable,
+          outfit.variable,
           "font-sans",
           inter.variable,
         )}

@@ -21,30 +21,21 @@ export const COLOR_THEMES: ColorTheme[] = [
     },
   },
   {
-    value: "modern-minimal",
-    label: "Modern Minimal",
+    value: "teenage-lobster",
+    label: "Teenage Lobster",
     swatch: {
-      primary: "oklch(0.6231 0.188 259.8145)",
-      secondary: "oklch(0.967 0.0029 264.5419)",
-      accent: "oklch(0.9514 0.025 236.8242)",
+      primary: "oklch(0.6707 0.2213 37.6393)",
+      secondary: "oklch(0.3705 0 0)",
+      accent: "oklch(0.9589 0.0198 44.7807)",
     },
   },
   {
-    value: "t3-chat",
-    label: "T3 Chat",
+    value: "claude",
+    label: "Claude",
     swatch: {
-      primary: "oklch(0.5316 0.1409 355.1999)",
-      secondary: "oklch(0.8696 0.0675 334.8991)",
-      accent: "oklch(0.8696 0.0675 334.8991)",
-    },
-  },
-  {
-    value: "mono",
-    label: "Mono",
-    swatch: {
-      primary: "oklch(0.5555 0 0)",
-      secondary: "oklch(0.9702 0 0)",
-      accent: "oklch(0.9702 0 0)",
+      primary: "oklch(0.6171 0.1375 39.0427)",
+      secondary: "oklch(0.9245 0.0138 92.9892)",
+      accent: "oklch(0.9245 0.0138 92.9892)",
     },
   },
 ];
