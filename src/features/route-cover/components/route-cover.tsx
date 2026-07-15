@@ -2,8 +2,8 @@
 
 import { ImagePlusIcon, Loader2Icon, PencilIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
-import { useIsOwner } from "@/features/auth/hooks/use-is-owner";
 import { Button } from "@/components/ui/button";
+import { useIsOwner } from "@/features/auth/hooks/use-is-owner";
 import { cn } from "@/lib/utils";
 import { useRouteCover } from "../hooks/use-route-cover";
 import type { RouteCoverKey } from "../lib/routes";

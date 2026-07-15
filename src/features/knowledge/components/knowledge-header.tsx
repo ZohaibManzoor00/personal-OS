@@ -2,8 +2,8 @@
 
 import { FilePlusIcon, FolderPlusIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { useIsOwner } from "@/features/auth/hooks/use-is-owner";
 import { Button } from "@/components/ui/button";
+import { useIsOwner } from "@/features/auth/hooks/use-is-owner";
 
 type Props = {
   title: string;
