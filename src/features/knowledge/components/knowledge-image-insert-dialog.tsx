@@ -1,9 +1,9 @@
 "use client";
 
 import { Loader2Icon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import Cropper, { type Area } from "react-easy-crop";
-import "react-easy-crop/react-easy-crop.css";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ReactCrop, { type Crop, type PercentCrop } from "react-image-crop";
+import "react-image-crop/dist/ReactCrop.css";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,20 +13,25 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Slider } from "@/components/ui/slider";
-import { cn } from "@/lib/utils";
 import { useContentImageUpload } from "../hooks/use-knowledge";
-import { cropImageToFile } from "../lib/crop-image";
+import {
+  cropImageToFile,
+  fullImageCrop,
+  percentCropToArea,
+} from "../lib/crop-image";
 
-const MIN_ZOOM = 1;
-const MAX_ZOOM = 3;
-
+// `undefined` = free-form crop (drag any edge or corner independently).
+// `null` sentinel isn't used; a number locks the crop to that ratio.
 const ASPECTS = [
+  { id: "free", label: "Free", value: undefined },
+  { id: "original", label: "Original", value: "original" },
   { id: "wide", label: "Wide", value: 16 / 9 },
   { id: "standard", label: "Standard", value: 4 / 3 },
   { id: "square", label: "Square", value: 1 },
   { id: "tall", label: "Tall", value: 3 / 4 },
 ] as const;
+
+type AspectOption = (typeof ASPECTS)[number]["value"];
 
 type Props = {
   nodeId: string;
@@ -50,31 +55,73 @@ export const KnowledgeImageInsertDialog = ({
     };
   }, [src]);
 
-  const [aspect, setAspect] = useState<number>(ASPECTS[0].value);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(MIN_ZOOM);
-  const [areaPixels, setAreaPixels] = useState<Area | null>(null);
+  const [selected, setSelected] = useState<AspectOption>(undefined);
+  const [crop, setCrop] = useState<Crop>();
+  const [completed, setCompleted] = useState<PercentCrop | null>(null);
+  const naturalRef = useRef<{ width: number; height: number } | null>(null);
 
   // Reset framing whenever a new file comes in.
   useEffect(() => {
-    setAspect(ASPECTS[0].value);
-    setCrop({ x: 0, y: 0 });
-    setZoom(MIN_ZOOM);
-    setAreaPixels(null);
+    setSelected(undefined);
+    setCrop(undefined);
+    setCompleted(null);
+    naturalRef.current = null;
   }, [file]);
 
+  // Resolve an aspect option to a concrete ratio for the current image.
+  const resolveAspect = useCallback(
+    (option: AspectOption): number | undefined => {
+      if (option === "original") {
+        const natural = naturalRef.current;
+        return natural ? natural.width / natural.height : undefined;
+      }
+      return option;
+    },
+    [],
+  );
+
+  const onImageLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    const { naturalWidth, naturalHeight, width, height } = event.currentTarget;
+    naturalRef.current = { width: naturalWidth, height: naturalHeight };
+    // Start with the entire image selected so nothing is cropped by default.
+    const initial = fullImageCrop(resolveAspect(selected), width, height);
+    setCrop(initial);
+    setCompleted(initial);
+  };
+
+  const applyAspect = (option: AspectOption) => {
+    setSelected(option);
+    const natural = naturalRef.current;
+    if (!natural) return;
+    const next = fullImageCrop(
+      resolveAspect(option),
+      natural.width,
+      natural.height,
+    );
+    setCrop(next);
+    setCompleted(next);
+  };
+
   const handleInsert = useCallback(async () => {
-    if (!file || !src || !areaPixels) return;
+    const natural = naturalRef.current;
+    if (!file || !src || !completed || !natural) return;
+
+    const area = percentCropToArea(completed, natural.width, natural.height);
     const cropped = await cropImageToFile({
       imageSrc: src,
-      area: areaPixels,
+      area,
       fileName: file.name,
       sourceType: file.type,
     });
     const url = await upload(cropped);
     if (url) onInsert(`![${file.name}](${url})`);
     onClose();
-  }, [file, src, areaPixels, upload, onInsert, onClose]);
+  }, [file, src, completed, upload, onInsert, onClose]);
+
+  const aspect = resolveAspect(selected);
+  const hasSelection = Boolean(
+    completed && completed.width > 0 && completed.height > 0,
+  );
 
   return (
     <Dialog
@@ -87,8 +134,8 @@ export const KnowledgeImageInsertDialog = ({
         <DialogHeader>
           <DialogTitle>Insert image</DialogTitle>
           <DialogDescription>
-            Pick a shape, then drag and zoom to frame it before adding it to the
-            page.
+            The whole image is selected by default. Drag any edge or corner to
+            crop, or pick a ratio to lock it.
           </DialogDescription>
         </DialogHeader>
 
@@ -98,8 +145,8 @@ export const KnowledgeImageInsertDialog = ({
               key={option.id}
               type="button"
               size="sm"
-              variant={aspect === option.value ? "default" : "outline"}
-              onClick={() => setAspect(option.value)}
+              variant={selected === option.value ? "default" : "outline"}
+              onClick={() => applyAspect(option.value)}
               disabled={isUploading}
             >
               {option.label}
@@ -107,33 +154,29 @@ export const KnowledgeImageInsertDialog = ({
           ))}
         </div>
 
-        <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-muted">
+        <div className="flex max-h-[60vh] justify-center overflow-hidden rounded-xl bg-muted p-2">
           {src && (
-            <Cropper
-              image={src}
+            <ReactCrop
               crop={crop}
-              zoom={zoom}
               aspect={aspect}
-              minZoom={MIN_ZOOM}
-              maxZoom={MAX_ZOOM}
-              showGrid={false}
-              onCropChange={setCrop}
-              onZoomChange={setZoom}
-              onCropComplete={(_area, pixels) => setAreaPixels(pixels)}
-            />
+              keepSelection
+              disabled={isUploading}
+              onChange={(_pixelCrop, percentCrop) => setCrop(percentCrop)}
+              onComplete={(_pixelCrop, percentCrop) =>
+                setCompleted(percentCrop)
+              }
+              className="max-h-[calc(60vh-1rem)]"
+            >
+              {/* biome-ignore lint/performance/noImgElement: local object URL, cropping preview */}
+              <img
+                src={src}
+                alt={file?.name ?? "Image to crop"}
+                onLoad={onImageLoad}
+                className="max-h-[calc(60vh-1rem)] w-auto object-contain"
+              />
+            </ReactCrop>
           )}
         </div>
-
-        <Slider
-          value={[zoom]}
-          min={MIN_ZOOM}
-          max={MAX_ZOOM}
-          step={0.01}
-          onValueChange={(values) => setZoom(values[0] ?? MIN_ZOOM)}
-          disabled={isUploading}
-          aria-label="Zoom"
-          className={cn("w-full")}
-        />
 
         <DialogFooter>
           <Button
@@ -148,7 +191,7 @@ export const KnowledgeImageInsertDialog = ({
           <Button
             type="button"
             onClick={handleInsert}
-            disabled={isUploading || !areaPixels}
+            disabled={isUploading || !hasSelection}
           >
             {isUploading ? (
               <>

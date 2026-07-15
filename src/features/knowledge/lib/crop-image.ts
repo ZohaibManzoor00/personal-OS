@@ -1,4 +1,42 @@
-import type { Area } from "react-easy-crop";
+import {
+  centerCrop,
+  makeAspectCrop,
+  type PercentCrop,
+} from "react-image-crop";
+
+/** A crop rectangle in source-image pixel coordinates. */
+export type Area = { x: number; y: number; width: number; height: number };
+
+/**
+ * A crop covering the whole image. With an aspect ratio it returns the largest
+ * centred crop of that ratio; without one it selects the entire image.
+ */
+export const fullImageCrop = (
+  aspect: number | undefined,
+  mediaWidth: number,
+  mediaHeight: number,
+): PercentCrop => {
+  if (!aspect) {
+    return { unit: "%", x: 0, y: 0, width: 100, height: 100 };
+  }
+  return centerCrop(
+    makeAspectCrop({ unit: "%", width: 100 }, aspect, mediaWidth, mediaHeight),
+    mediaWidth,
+    mediaHeight,
+  );
+};
+
+/** Converts a react-image-crop percentage crop into source-pixel coordinates. */
+export const percentCropToArea = (
+  crop: PercentCrop,
+  naturalWidth: number,
+  naturalHeight: number,
+): Area => ({
+  x: (crop.x / 100) * naturalWidth,
+  y: (crop.y / 100) * naturalHeight,
+  width: (crop.width / 100) * naturalWidth,
+  height: (crop.height / 100) * naturalHeight,
+});
 
 // Cap the exported image so we don't upload a needlessly huge file for a small card thumbnail.
 const MAX_OUTPUT_SIZE = 1024;
