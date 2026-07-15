@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useKnowledgeSearch } from "../hooks/use-knowledge";
 import { getCoverImage, type KnowledgeSearchResult } from "../types";
 import { Highlighted, ResultBreadcrumbTitle } from "./knowledge-highlight";
+import { useKnowledgeSection } from "./knowledge-section-context";
 
 const SearchResultCard = ({
   node,
@@ -17,13 +18,14 @@ const SearchResultCard = ({
   node: KnowledgeSearchResult;
   onKeyDown: React.KeyboardEventHandler<HTMLAnchorElement>;
 }) => {
+  const section = useKnowledgeSection();
   const Icon = node.type === "SPACE" ? FolderIcon : FileTextIcon;
   const cover = getCoverImage(node);
   const usedAt = node.lastViewedAt ?? node.updatedAt;
 
   return (
     <Link
-      href={`/learnings/${node.id}`}
+      href={`${section.basePath}/${node.id}`}
       prefetch
       data-search-result
       onKeyDown={onKeyDown}

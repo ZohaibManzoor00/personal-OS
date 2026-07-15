@@ -6,8 +6,10 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { useRecentNodes } from "../hooks/use-knowledge";
 import { getCoverImage } from "../types";
+import { useKnowledgeSection } from "./knowledge-section-context";
 
 export const KnowledgeRecent = () => {
+  const section = useKnowledgeSection();
   const { data: nodes } = useRecentNodes();
 
   if (nodes.length === 0) return null;
@@ -21,7 +23,7 @@ export const KnowledgeRecent = () => {
           const cover = getCoverImage(node);
 
           return (
-            <Link key={node.id} href={`/learnings/${node.id}`} prefetch className="focus-visible:outline-none">
+            <Link key={node.id} href={`${section.basePath}/${node.id}`} prefetch className="focus-visible:outline-none">
               <Card size="sm" className="h-full min-w-0 flex-row items-center gap-3 p-3 transition-colors hover:bg-accent/50">
                 <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-muted-foreground ring-1 ring-border">
                   {cover ? (

@@ -7,6 +7,7 @@ import { ErrorView, LoadingView } from "@/components/entity-component";
 import { useKnowledgeNode, useRecordView, useScrolledPast } from "../hooks/use-knowledge";
 import { KnowledgeEditor } from "./knowledge-editor";
 import { KnowledgeHeaderBar } from "./knowledge-header-bar";
+import { useKnowledgeSection } from "./knowledge-section-context";
 import { KnowledgeStickyHeader } from "./knowledge-sticky-header";
 
 export const KnowledgePageView = ({ nodeId }: { nodeId: string }) => {
@@ -31,11 +32,12 @@ export const KnowledgePageView = ({ nodeId }: { nodeId: string }) => {
 
 const KnowledgePageContent = ({ nodeId, headerRef }: { nodeId: string; headerRef?: React.Ref<HTMLDivElement> }) => {
   const router = useRouter();
+  const section = useKnowledgeSection();
   const { data: node } = useKnowledgeNode(nodeId);
 
   useRecordView(nodeId);
 
-  const goToParent = () => router.push(node.parentId ? `/learnings/${node.parentId}` : "/learnings");
+  const goToParent = () => router.push(node.parentId ? `${section.basePath}/${node.parentId}` : section.basePath);
 
   return <KnowledgeEditor nodeId={nodeId} onDeleted={goToParent} sentinelRef={headerRef} />;
 };

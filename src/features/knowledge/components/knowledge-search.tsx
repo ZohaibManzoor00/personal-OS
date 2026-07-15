@@ -5,9 +5,11 @@ import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useKnowledgeParams, useSearchFocusHotkey } from "../hooks/use-knowledge";
+import { useKnowledgeSection } from "./knowledge-section-context";
 import { SearchKbd } from "./search-kbd";
 
 export const KnowledgeSearch = ({ className }: { className?: string }) => {
+  const section = useKnowledgeSection();
   const [params, setParams] = useKnowledgeParams();
   const [value, setValue] = useState(params.search);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -33,7 +35,7 @@ export const KnowledgeSearch = ({ className }: { className?: string }) => {
         ref={inputRef}
         data-knowledge-search-input
         className="bg-background pr-12 pl-9"
-        placeholder="Search learnings"
+        placeholder={section.searchPlaceholder}
         value={value}
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={(event) => {

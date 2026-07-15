@@ -15,6 +15,7 @@ import { KnowledgeNodeDialog } from "./knowledge-node-dialog";
 import { KnowledgeRecent } from "./knowledge-recent";
 import { KnowledgeSearch } from "./knowledge-search";
 import { KnowledgeSearchResults } from "./knowledge-search-results";
+import { useKnowledgeSection } from "./knowledge-section-context";
 import { KnowledgeViewToggle } from "./knowledge-view-toggle";
 
 type CreateHandlers = {
@@ -24,6 +25,7 @@ type CreateHandlers = {
 
 export const KnowledgeRootView = () => {
   const router = useRouter();
+  const section = useKnowledgeSection();
   const [create, setCreate] = useState<{
     open: boolean;
     type: "SPACE" | "PAGE";
@@ -43,9 +45,9 @@ export const KnowledgeRootView = () => {
         <KnowledgeSearch className="w-64 shrink-0" />
       </HeaderPortal>
       <RouteCover
-        route="knowledge"
-        title="Learnings"
-        description="A place to capture what I've learned."
+        route={section.coverRoute}
+        title={section.cover.title}
+        description={section.cover.description}
         actions={
           <>
             <Button variant="outline" size="sm" onClick={handlers.onNewSpace}>
@@ -68,10 +70,8 @@ export const KnowledgeRootView = () => {
             <KnowledgeViewToggle />
           </div>
 
-          <ErrorBoundary
-            fallback={<ErrorView message="Error loading learnings" />}
-          >
-            <Suspense fallback={<LoadingView message="Loading learnings..." />}>
+          <ErrorBoundary fallback={<ErrorView message="Error loading content" />}>
+            <Suspense fallback={<LoadingView message="Loading..." />}>
               <KnowledgeRootContent {...handlers} />
             </Suspense>
           </ErrorBoundary>
@@ -86,7 +86,7 @@ export const KnowledgeRootView = () => {
         onOpenChange={(open) => setCreate((prev) => ({ ...prev, open }))}
         onCreated={(created) => {
           if (created.type === "PAGE")
-            router.push(`/learnings/${created.id}?edit=1`);
+            router.push(`${section.basePath}/${created.id}?edit=1`);
         }}
       />
     </div>
@@ -108,6 +108,7 @@ const KnowledgeRecentSection = () => {
 };
 
 const KnowledgeRootContent = ({ onNewSpace, onNewPage }: CreateHandlers) => {
+  const section = useKnowledgeSection();
   const [params] = useKnowledgeParams();
   const { data: items } = useListChildren(null);
 
@@ -118,8 +119,8 @@ const KnowledgeRootContent = ({ onNewSpace, onNewPage }: CreateHandlers) => {
   if (items.length === 0) {
     return (
       <KnowledgeEmptyState
-        title="Start your learnings base"
-        description="Create your first space to begin organizing everything you know."
+        title={section.emptyRoot.title}
+        description={section.emptyRoot.description}
         onNewSpace={onNewSpace}
         onNewPage={onNewPage}
       />

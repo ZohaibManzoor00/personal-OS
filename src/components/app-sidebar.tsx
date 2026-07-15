@@ -1,6 +1,6 @@
 "use client";
 
-import { BookIcon, BriefcaseIcon, HomeIcon, LogOutIcon } from "lucide-react";
+import { BookIcon, BotIcon, BriefcaseIcon, FolderOpenIcon, HomeIcon, LogOutIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -119,11 +119,16 @@ const menuItems = [
         icon: BriefcaseIcon,
         url: "/career",
       },
-      // {
-      //   title: "Workflows",
-      //   icon: FolderOpenIcon,
-      //   url: "/workflows",
-      // },
+      {
+        title: "Projects",
+        icon: FolderOpenIcon,
+        url: "/projects",
+      },
+      {
+        title: "AI Workflows",
+        icon: BotIcon,
+        url: "/workflows",
+      },
     ],
   },
 ];

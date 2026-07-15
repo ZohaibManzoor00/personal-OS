@@ -11,6 +11,7 @@ import { KnowledgeHeader } from "./knowledge-header";
 import { KnowledgeHeaderBar } from "./knowledge-header-bar";
 import { KnowledgeNodeDialog } from "./knowledge-node-dialog";
 import { KnowledgeNodeMenu } from "./knowledge-node-menu";
+import { useKnowledgeSection } from "./knowledge-section-context";
 import { KnowledgeViewToggle } from "./knowledge-view-toggle";
 
 type CreateHandlers = {
@@ -20,6 +21,7 @@ type CreateHandlers = {
 
 export const KnowledgeSpaceView = ({ nodeId }: { nodeId: string }) => {
   const router = useRouter();
+  const section = useKnowledgeSection();
   const { data: node } = useKnowledgeNode(nodeId);
 
   useRecordView(nodeId);
@@ -37,7 +39,7 @@ export const KnowledgeSpaceView = ({ nodeId }: { nodeId: string }) => {
     onNewPage: () => openCreate("PAGE"),
   };
 
-  const goToParent = () => router.push(node.parentId ? `/learnings/${node.parentId}` : "/learnings");
+  const goToParent = () => router.push(node.parentId ? `${section.basePath}/${node.parentId}` : section.basePath);
 
   return (
     <div className="flex flex-col gap-8">
@@ -57,7 +59,7 @@ export const KnowledgeSpaceView = ({ nodeId }: { nodeId: string }) => {
         open={create.open}
         onOpenChange={(open) => setCreate((prev) => ({ ...prev, open }))}
         onCreated={(created) => {
-          if (created.type === "PAGE") router.push(`/learnings/${created.id}?edit=1`);
+          if (created.type === "PAGE") router.push(`${section.basePath}/${created.id}?edit=1`);
         }}
       />
     </div>

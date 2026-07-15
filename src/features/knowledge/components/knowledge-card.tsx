@@ -8,10 +8,12 @@ import { cn } from "@/lib/utils";
 import { getCoverImage, type KnowledgeNode } from "../types";
 import { KnowledgeMarkdown } from "./knowledge-markdown";
 import { KnowledgeNodeMenu } from "./knowledge-node-menu";
+import { useKnowledgeSection } from "./knowledge-section-context";
 
 const PREVIEW_CHAR_LIMIT = 500;
 
 export const KnowledgeCard = ({ node }: { node: KnowledgeNode }) => {
+  const section = useKnowledgeSection();
   const isSpace = node.type === "SPACE";
   const Icon = isSpace ? FolderIcon : FileTextIcon;
   const cover = getCoverImage(node);
@@ -25,7 +27,7 @@ export const KnowledgeCard = ({ node }: { node: KnowledgeNode }) => {
       className="group/card relative h-full gap-0 p-0 py-0! transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
     >
       <Link
-        href={`/learnings/${node.id}`}
+        href={`${section.basePath}/${node.id}`}
         prefetch
         aria-label={node.title}
         className="absolute inset-0 rounded-[inherit] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

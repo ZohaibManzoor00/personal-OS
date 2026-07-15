@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useKnowledgeSearch, useSearchFocusHotkey } from "../hooks/use-knowledge";
 import { getCoverImage } from "../types";
 import { Highlighted, ResultBreadcrumbTitle } from "./knowledge-highlight";
+import { useKnowledgeSection } from "./knowledge-section-context";
 import { SearchKbd } from "./search-kbd";
 
 const SEARCH_DEBOUNCE = 250;
@@ -29,6 +30,7 @@ export const KnowledgePageSearch = ({
   className?: string;
   align?: "left" | "right";
 }) => {
+  const section = useKnowledgeSection();
   const [focused, setFocused] = useState(false);
   const [deferred, setDeferred] = useState(value);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -64,7 +66,7 @@ export const KnowledgePageSearch = ({
         <Input
           ref={inputRef}
           className="bg-background pr-12 pl-9"
-          placeholder="Search learnings"
+          placeholder={section.searchPlaceholder}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onFocus={() => setFocused(true)}
@@ -110,7 +112,7 @@ export const KnowledgePageSearch = ({
               return (
                 <Link
                   key={node.id}
-                  href={`/learnings/${node.id}`}
+                  href={`${section.basePath}/${node.id}`}
                   prefetch
                   onClick={() => setFocused(false)}
                   className="flex items-start gap-2.5 rounded-md px-2.5 py-2 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"

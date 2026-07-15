@@ -4,7 +4,7 @@ interface Props {
   params: Promise<{ nodeId: string }>;
 }
 
-export default async function LearningsNodePage({ params }: Props) {
+export default async function CareerNodePage({ params }: Props) {
   const { nodeId } = await params;
-  return <KnowledgeSectionNodePage section="learnings" nodeId={nodeId} />;
+  return <KnowledgeSectionNodePage section="career" nodeId={nodeId} />;
 }

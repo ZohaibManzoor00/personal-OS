@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Tree, TreeItem, TreeItemLabel } from "@/components/reui/tree";
 import { Button } from "@/components/ui/button";
 import type { KnowledgeTreeNode } from "../types";
+import { useKnowledgeSection } from "./knowledge-section-context";
 
 type TreeItemData = {
   name: string;
@@ -26,6 +27,7 @@ type Props = {
 
 export const KnowledgeTree = ({ nodes, rootId }: Props) => {
   const router = useRouter();
+  const section = useKnowledgeSection();
   const [allExpanded, setAllExpanded] = useState(false);
 
   const items = useMemo(() => {
@@ -43,7 +45,7 @@ export const KnowledgeTree = ({ nodes, rootId }: Props) => {
 
     const record: Record<string, TreeItemData> = {
       [ROOT_ID]: {
-        name: "Learnings",
+        name: section.label,
         isFolder: true,
         children: childrenByParent.get(rootId) ?? [],
         count: 0,
@@ -61,7 +63,7 @@ export const KnowledgeTree = ({ nodes, rootId }: Props) => {
     }
 
     return record;
-  }, [nodes, rootId]);
+  }, [nodes, rootId, section.label]);
 
   const tree = useTree<TreeItemData>({
     rootItemId: ROOT_ID,
@@ -69,7 +71,7 @@ export const KnowledgeTree = ({ nodes, rootId }: Props) => {
     getItemName: (item) => item.getItemData().name,
     isItemFolder: (item) => item.getItemData().isFolder,
     onPrimaryAction: (item) => {
-      if (!item.isFolder()) router.push(`/learnings/${item.getId()}`);
+      if (!item.isFolder()) router.push(`${section.basePath}/${item.getId()}`);
     },
     dataLoader: {
       getItem: (id) => items[id],
@@ -113,7 +115,7 @@ export const KnowledgeTree = ({ nodes, rootId }: Props) => {
               key={item.getId()}
               item={item}
               onDoubleClick={() => {
-                if (isFolder) router.push(`/learnings/${item.getId()}`);
+                if (isFolder) router.push(`${section.basePath}/${item.getId()}`);
               }}
             >
               <TreeItemLabel className="bg-transparent">

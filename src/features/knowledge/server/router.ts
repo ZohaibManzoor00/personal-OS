@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { deleteObject, getPresignedUploadUrl, getPublicUrl } from "@/lib/r2";
 import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
 import { HIGHLIGHT_END, HIGHLIGHT_START } from "../lib/search-highlight";
+import { KNOWLEDGE_SECTIONS } from "../lib/sections";
 import { slugify } from "../lib/slug";
 
 const SEARCH_LIMIT = 20;
@@ -30,6 +31,7 @@ Rules:
 - Output GitHub-Flavored Markdown only. Do NOT wrap the whole document in a code fence and do NOT add any commentary before or after it.`;
 
 const nodeType = z.enum(["SPACE", "PAGE"]);
+const knowledgeSection = z.enum(KNOWLEDGE_SECTIONS);
 
 const coverInclude = {
   images: { orderBy: { createdAt: "desc" }, take: 1 },
@@ -50,11 +52,13 @@ const buildImageKey = ({ userId, nodeId, contentType }: { userId: string; nodeId
 
 const uniqueSlug = async ({
   userId,
+  section,
   parentId,
   title,
   excludeId,
 }: {
   userId: string;
+  section: string;
   parentId: string | null;
   title: string;
   excludeId?: string;
@@ -67,6 +71,7 @@ const uniqueSlug = async ({
     const existing = await prisma.node.findFirst({
       where: {
         userId,
+        section,
         parentId,
         slug,
         ...(excludeId ? { id: { not: excludeId } } : {}),
@@ -80,17 +85,20 @@ const uniqueSlug = async ({
 };
 
 export const knowledgeRouter = createTRPCRouter({
-  listChildren: protectedProcedure.input(z.object({ parentId: z.string().nullable() })).query(async ({ ctx, input }) => {
-    return await prisma.node.findMany({
-      where: {
-        userId: ctx.auth.user.id,
-        parentId: input.parentId,
-        archivedAt: null,
-      },
-      orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
-      include: coverInclude,
-    });
-  }),
+  listChildren: protectedProcedure
+    .input(z.object({ section: knowledgeSection, parentId: z.string().nullable() }))
+    .query(async ({ ctx, input }) => {
+      return await prisma.node.findMany({
+        where: {
+          userId: ctx.auth.user.id,
+          section: input.section,
+          parentId: input.parentId,
+          archivedAt: null,
+        },
+        orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
+        include: coverInclude,
+      });
+    }),
 
   get: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
     return await prisma.node.findFirstOrThrow({
@@ -99,25 +107,26 @@ export const knowledgeRouter = createTRPCRouter({
     });
   }),
 
-  listSpaces: protectedProcedure.query(async ({ ctx }) => {
+  listSpaces: protectedProcedure.input(z.object({ section: knowledgeSection })).query(async ({ ctx, input }) => {
     return await prisma.node.findMany({
-      where: { userId: ctx.auth.user.id, type: "SPACE", archivedAt: null },
+      where: { userId: ctx.auth.user.id, section: input.section, type: "SPACE", archivedAt: null },
       orderBy: { title: "asc" },
     });
   }),
 
-  listTree: protectedProcedure.query(async ({ ctx }) => {
+  listTree: protectedProcedure.input(z.object({ section: knowledgeSection })).query(async ({ ctx, input }) => {
     return await prisma.node.findMany({
-      where: { userId: ctx.auth.user.id, archivedAt: null },
+      where: { userId: ctx.auth.user.id, section: input.section, archivedAt: null },
       orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
       select: { id: true, title: true, type: true, parentId: true },
     });
   }),
 
-  listRecent: protectedProcedure.query(async ({ ctx }) => {
+  listRecent: protectedProcedure.input(z.object({ section: knowledgeSection })).query(async ({ ctx, input }) => {
     return await prisma.node.findMany({
       where: {
         userId: ctx.auth.user.id,
+        section: input.section,
         archivedAt: null,
         lastViewedAt: { not: null },
       },
@@ -164,6 +173,7 @@ export const knowledgeRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       z.object({
+        section: knowledgeSection,
         parentId: z.string().nullable(),
         type: nodeType,
         title: z.string().min(1).max(200),
@@ -171,6 +181,10 @@ export const knowledgeRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.auth.user.id;
+
+      // Nested nodes always inherit their parent's section; only root-level
+      // nodes take the section from the input.
+      let section: string = input.section;
 
       if (input.parentId) {
         const parent = await prisma.node.findFirst({
@@ -186,17 +200,19 @@ export const knowledgeRouter = createTRPCRouter({
             code: "BAD_REQUEST",
             message: "Pages cannot contain other nodes",
           });
+        section = parent.section;
       }
 
       const [slug, siblingCount] = await Promise.all([
-        uniqueSlug({ userId, parentId: input.parentId, title: input.title }),
-        prisma.node.count({ where: { userId, parentId: input.parentId } }),
+        uniqueSlug({ userId, section, parentId: input.parentId, title: input.title }),
+        prisma.node.count({ where: { userId, section, parentId: input.parentId } }),
       ]);
 
       return await prisma.node.create({
         data: {
           title: input.title,
           slug,
+          section,
           type: input.type,
           body: input.type === "PAGE" ? "" : null,
           sortOrder: siblingCount,
@@ -225,6 +241,7 @@ export const knowledgeRouter = createTRPCRouter({
         input.title !== undefined
           ? await uniqueSlug({
               userId,
+              section: node.section,
               parentId: node.parentId,
               title: input.title,
               excludeId: node.id,
@@ -280,6 +297,11 @@ export const knowledgeRouter = createTRPCRouter({
           code: "BAD_REQUEST",
           message: "You can only move nodes into a space",
         });
+      if (target.section !== node.section)
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "You can only move nodes within the same section",
+        });
 
       let parentId = target.parentId;
       while (parentId) {
@@ -298,6 +320,7 @@ export const knowledgeRouter = createTRPCRouter({
 
     const slug = await uniqueSlug({
       userId,
+      section: node.section,
       parentId: input.parentId,
       title: node.title,
       excludeId: node.id,
@@ -309,7 +332,7 @@ export const knowledgeRouter = createTRPCRouter({
     });
   }),
 
-  search: protectedProcedure.input(z.object({ query: z.string() })).query(async ({ ctx, input }) => {
+  search: protectedProcedure.input(z.object({ section: knowledgeSection, query: z.string() })).query(async ({ ctx, input }) => {
     // Turn the raw input into a prefix tsquery: strip tsquery operators so user
     // input can't break the syntax, treat each word as a prefix (`:*`) so
     // search-as-you-type matches partial words, and AND the terms together.
@@ -341,6 +364,7 @@ export const knowledgeRouter = createTRPCRouter({
         ts_headline('english', coalesce("body", ''), to_tsquery('english', ${tsquery}), ${snippetHeadlineOpts}) AS "snippet"
       FROM "Node"
       WHERE "userId" = ${ctx.auth.user.id}
+        AND "section" = ${input.section}
         AND "archivedAt" IS NULL
         AND "searchVector" @@ to_tsquery('english', ${tsquery})
       ORDER BY

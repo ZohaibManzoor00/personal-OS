@@ -11,8 +11,10 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { useAncestors } from "../hooks/use-knowledge";
+import { useKnowledgeSection } from "./knowledge-section-context";
 
 export const KnowledgeBreadcrumb = ({ nodeId }: { nodeId: string }) => {
+  const section = useKnowledgeSection();
   const { data: ancestors } = useAncestors(nodeId);
 
   return (
@@ -20,7 +22,7 @@ export const KnowledgeBreadcrumb = ({ nodeId }: { nodeId: string }) => {
       <BreadcrumbList>
         <BreadcrumbItem>
           <BreadcrumbLink asChild>
-            <Link href="/learnings">Learnings</Link>
+            <Link href={section.basePath}>{section.label}</Link>
           </BreadcrumbLink>
         </BreadcrumbItem>
         {ancestors.map((node, index) => {
@@ -34,7 +36,7 @@ export const KnowledgeBreadcrumb = ({ nodeId }: { nodeId: string }) => {
                   <BreadcrumbPage>{node.title}</BreadcrumbPage>
                 ) : (
                   <BreadcrumbLink asChild>
-                    <Link href={`/learnings/${node.id}`}>{node.title}</Link>
+                    <Link href={`${section.basePath}/${node.id}`}>{node.title}</Link>
                   </BreadcrumbLink>
                 )}
               </BreadcrumbItem>

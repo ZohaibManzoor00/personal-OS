@@ -4,6 +4,7 @@ import { parseAsString } from "nuqs/server";
 import { type RefObject, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { useTRPC } from "@/trpc/client";
+import { useKnowledgeSection } from "../components/knowledge-section-context";
 import type { KnowledgeNode } from "../types";
 
 const readImageDimensions = (file: File) =>
@@ -31,12 +32,14 @@ export const useKnowledgeParams = () => {
 
 export const useListChildren = (parentId: string | null) => {
   const trpc = useTRPC();
-  return useSuspenseQuery(trpc.knowledge.listChildren.queryOptions({ parentId }));
+  const { section } = useKnowledgeSection();
+  return useSuspenseQuery(trpc.knowledge.listChildren.queryOptions({ section, parentId }));
 };
 
 export const useKnowledgeTree = (enabled = true) => {
   const trpc = useTRPC();
-  return useQuery(trpc.knowledge.listTree.queryOptions(undefined, { enabled }));
+  const { section } = useKnowledgeSection();
+  return useQuery(trpc.knowledge.listTree.queryOptions({ section }, { enabled }));
 };
 
 export type KnowledgeView = "cards" | "tree";
@@ -155,12 +158,14 @@ export const useAncestors = (id: string) => {
 
 export const useSpaces = (enabled = true) => {
   const trpc = useTRPC();
-  return useQuery(trpc.knowledge.listSpaces.queryOptions(undefined, { enabled }));
+  const { section } = useKnowledgeSection();
+  return useQuery(trpc.knowledge.listSpaces.queryOptions({ section }, { enabled }));
 };
 
 export const useRecentNodes = () => {
   const trpc = useTRPC();
-  return useSuspenseQuery(trpc.knowledge.listRecent.queryOptions());
+  const { section } = useKnowledgeSection();
+  return useSuspenseQuery(trpc.knowledge.listRecent.queryOptions({ section }));
 };
 
 export const useRecordView = (id: string) => {
@@ -260,7 +265,8 @@ export const usePreviewHotkeys = ({ enabled, onEdit }: { enabled: boolean; onEdi
 
 export const useKnowledgeSearch = (query: string) => {
   const trpc = useTRPC();
-  return useQuery(trpc.knowledge.search.queryOptions({ query }, { enabled: query.trim().length > 0 }));
+  const { section } = useKnowledgeSection();
+  return useQuery(trpc.knowledge.search.queryOptions({ section, query }, { enabled: query.trim().length > 0 }));
 };
 
 export const useCreateNode = () => {

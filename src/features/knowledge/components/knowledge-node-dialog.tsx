@@ -10,6 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import type { Node as KnowledgeNode } from "@/generated/prisma/client";
 import { useCreateNode, useUpdateNode } from "../hooks/use-knowledge";
+import { useKnowledgeSection } from "./knowledge-section-context";
 
 const schema = z.object({
   title: z.string().min(1, "Title is required").max(200),
@@ -38,6 +39,7 @@ type Props = (CreateProps | RenameProps) & {
 export const KnowledgeNodeDialog = (props: Props) => {
   const { open, onOpenChange, mode, onCreated } = props;
 
+  const { section } = useKnowledgeSection();
   const createNode = useCreateNode();
   const updateNode = useUpdateNode();
 
@@ -57,7 +59,7 @@ export const KnowledgeNodeDialog = (props: Props) => {
   const onSubmit = (values: FormValues) => {
     if (mode === "create") {
       createNode.mutate(
-        { parentId: props.parentId, type: props.type, title: values.title },
+        { section, parentId: props.parentId, type: props.type, title: values.title },
         {
           onSuccess: (node) => {
             onOpenChange(false);

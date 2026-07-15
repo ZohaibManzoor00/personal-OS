@@ -80,6 +80,11 @@ model Node {
   title String
   slug  String
 
+  /// Which top-level app route this node belongs to (e.g. "learnings",
+  /// "career", "projects", "workflows"). Scopes every query so each route is
+  /// its own independent knowledge base sharing the same shape.
+  section String @default("learnings")
+
   type NodeType
 
   /// Rich text content (Markdown, HTML, or Tiptap JSON string)
@@ -112,8 +117,9 @@ model Node {
   /// Prisma Client — use $queryRaw with @@ / to_tsquery against it.
   searchVector Unsupported("tsvector")? @default(dbgenerated())
 
-  @@unique([userId, parentId, slug])
+  @@unique([userId, section, parentId, slug])
   @@index([userId])
+  @@index([userId, section])
   @@index([parentId])
   @@index([userId, lastViewedAt])
   @@index([searchVector], type: Gin)
