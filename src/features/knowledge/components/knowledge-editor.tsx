@@ -4,6 +4,7 @@ import { formatDistanceToNow } from "date-fns";
 import { CheckIcon, ImageIcon, Loader2Icon, PencilIcon, SparklesIcon, TerminalIcon } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useIsOwner } from "@/features/auth/hooks/use-is-owner";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Toggle } from "@/components/ui/toggle";
@@ -29,6 +30,7 @@ export const KnowledgeEditor = ({
   sentinelRef?: React.Ref<HTMLDivElement>;
 }) => {
   const { data: node } = useKnowledgeNode(nodeId);
+  const { isOwner } = useIsOwner();
   const updateNode = useUpdateNode();
   const polishMarkdown = usePolishMarkdown();
 
@@ -36,7 +38,7 @@ export const KnowledgeEditor = ({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const [isEditing, setIsEditing] = useState(() => searchParams.get("edit") === "1");
+  const [isEditing, setIsEditing] = useState(() => isOwner && searchParams.get("edit") === "1");
   const [autoSave, setAutoSave] = useState(false);
   const [vimMode, setVimMode] = useVimMode();
   const [content, setContent] = useState(node.body ?? "");
@@ -126,13 +128,15 @@ export const KnowledgeEditor = ({
     polishMarkdown.mutate({ text: content }, { onSuccess: (result) => setContent(result.markdown) });
   };
 
-  const enterEdit = useCallback(() => setIsEditing(true), []);
+  const enterEdit = useCallback(() => {
+    if (isOwner) setIsEditing(true);
+  }, [isOwner]);
   const exitEdit = () => {
     handleSave();
     setIsEditing(false);
   };
 
-  usePreviewHotkeys({ enabled: !isEditing, onEdit: enterEdit });
+  usePreviewHotkeys({ enabled: !isEditing && isOwner, onEdit: enterEdit });
 
   const status = updateNode.isPending ? "Saving…" : isDirty ? "Unsaved changes" : "Saved";
 
@@ -200,12 +204,12 @@ export const KnowledgeEditor = ({
                 </Button>
               )}
             </>
-          ) : (
+          ) : isOwner ? (
             <Button variant="outline" size="sm" onClick={enterEdit}>
               <PencilIcon className="size-4" />
               Edit
             </Button>
-          )}
+          ) : null}
           <KnowledgeNodeMenu node={node} onDeleted={onDeleted} />
         </div>
       </div>
@@ -224,7 +228,7 @@ export const KnowledgeEditor = ({
         />
       ) : content.trim() ? (
         <KnowledgeMarkdown content={content} className="flex-1" />
-      ) : (
+      ) : isOwner ? (
         <button
           type="button"
           onClick={enterEdit}
@@ -233,6 +237,10 @@ export const KnowledgeEditor = ({
           <PencilIcon className="size-5" />
           <span className="text-sm">This page is empty. Click to start writing.</span>
         </button>
+      ) : (
+        <div className="flex min-h-[240px] flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed bg-card/40 text-muted-foreground">
+          <span className="text-sm">This page is empty.</span>
+        </div>
       )}
 
       <KnowledgeImageInsertDialog nodeId={nodeId} file={pendingImages[0] ?? null} onInsert={insertMarkdown} onClose={closePendingImage} />

@@ -2,6 +2,7 @@
 
 import { ImagePlusIcon, Loader2Icon, PencilIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
+import { useIsOwner } from "@/features/auth/hooks/use-is-owner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useRouteCover } from "../hooks/use-route-cover";
@@ -27,6 +28,7 @@ type Props = {
  */
 export const RouteCover = ({ route, title, description, actions, children, className }: Props) => {
   const { cover, upload, applyDefault, remove, isUploading, isRemoving } = useRouteCover(route);
+  const { isOwner } = useIsOwner();
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const isBusy = isUploading || isRemoving;
@@ -59,7 +61,8 @@ export const RouteCover = ({ route, title, description, actions, children, class
       <div className="absolute inset-x-0 bottom-0 h-2 bg-[linear-gradient(to_top,var(--background)_0%,color-mix(in_oklab,var(--background)_75%,transparent)_25%,color-mix(in_oklab,var(--background)_40%,transparent)_50%,color-mix(in_oklab,var(--background)_15%,transparent)_72%,transparent_100%)]" />
 
       {/* Hover controls, pinned to the top-right of the centered content column
-          so they sit in the strip above the title/actions row. */}
+          so they sit in the strip above the title/actions row. Owner only. */}
+      {isOwner && (
       <div className="pointer-events-none absolute inset-x-0 top-3 z-20 px-4 md:px-10">
         <div className="pointer-events-auto mx-auto flex max-w-7xl justify-end gap-1.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover/cover:opacity-100">
           <Button
@@ -94,6 +97,7 @@ export const RouteCover = ({ route, title, description, actions, children, class
           )}
         </div>
       </div>
+      )}
 
       {/* Overlaid content, aligned to the centered page column. The top padding
           leaves room for the hover controls strip so nothing overlaps. */}
