@@ -5,22 +5,8 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import type { Node as KnowledgeNode } from "@/generated/prisma/client";
 import { useCreateNode, useUpdateNode } from "../hooks/use-knowledge";
@@ -66,12 +52,7 @@ export const KnowledgeNodeDialog = (props: Props) => {
 
   const isPending = createNode.isPending || updateNode.isPending;
 
-  const label =
-    mode === "rename"
-      ? "Rename"
-      : props.type === "SPACE"
-        ? "New space"
-        : "New page";
+  const label = mode === "rename" ? "Rename" : props.type === "SPACE" ? "New space" : "New page";
 
   const onSubmit = (values: FormValues) => {
     if (mode === "create") {
@@ -87,10 +68,7 @@ export const KnowledgeNodeDialog = (props: Props) => {
       return;
     }
 
-    updateNode.mutate(
-      { id: props.node.id, title: values.title },
-      { onSuccess: () => onOpenChange(false) },
-    );
+    updateNode.mutate({ id: props.node.id, title: values.title }, { onSuccess: () => onOpenChange(false) });
   };
 
   return (
@@ -107,10 +85,7 @@ export const KnowledgeNodeDialog = (props: Props) => {
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="flex flex-col gap-6"
-          >
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-6">
             <FormField
               control={form.control}
               name="title"
@@ -120,11 +95,7 @@ export const KnowledgeNodeDialog = (props: Props) => {
                   <FormControl>
                     <Input
                       autoFocus
-                      placeholder={
-                        mode === "create" && props.type === "SPACE"
-                          ? "Computer Science"
-                          : "Untitled"
-                      }
+                      placeholder={mode === "create" && props.type === "SPACE" ? "Computer Science" : "Untitled"}
                       {...field}
                     />
                   </FormControl>
@@ -133,12 +104,7 @@ export const KnowledgeNodeDialog = (props: Props) => {
               )}
             />
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={isPending}
-              >
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isPending}>

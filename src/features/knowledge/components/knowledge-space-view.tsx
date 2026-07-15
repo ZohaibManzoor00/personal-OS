@@ -4,11 +4,7 @@ import { useRouter } from "next/navigation";
 import { Suspense, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorView, LoadingView } from "@/components/entity-component";
-import {
-  useKnowledgeNode,
-  useListChildren,
-  useRecordView,
-} from "../hooks/use-knowledge";
+import { useKnowledgeNode, useListChildren, useRecordView } from "../hooks/use-knowledge";
 import { KnowledgeBreadcrumb } from "./knowledge-breadcrumb";
 import { KnowledgeCollection } from "./knowledge-collection";
 import { KnowledgeEmptyState } from "./knowledge-empty-state";
@@ -32,29 +28,21 @@ export const KnowledgeSpaceView = ({ nodeId }: { nodeId: string }) => {
     open: boolean;
     type: "SPACE" | "PAGE";
   }>({ open: false, type: "PAGE" });
-  const openCreate = (type: "SPACE" | "PAGE") =>
-    setCreate({ open: true, type });
+  const openCreate = (type: "SPACE" | "PAGE") => setCreate({ open: true, type });
 
   const handlers: CreateHandlers = {
     onNewSpace: () => openCreate("SPACE"),
     onNewPage: () => openCreate("PAGE"),
   };
 
-  const goToParent = () =>
-    router.push(node.parentId ? `/knowledge/${node.parentId}` : "/knowledge");
+  const goToParent = () => router.push(node.parentId ? `/knowledge/${node.parentId}` : "/knowledge");
 
   return (
     <div className="flex flex-col gap-8">
       <KnowledgeBreadcrumb nodeId={nodeId} />
-      <KnowledgeHeader
-        title={node.title}
-        {...handlers}
-        actions={<KnowledgeNodeMenu node={node} onDeleted={goToParent} />}
-      />
+      <KnowledgeHeader title={node.title} {...handlers} actions={<KnowledgeNodeMenu node={node} onDeleted={goToParent} />} />
 
-      <ErrorBoundary
-        fallback={<ErrorView message="Error loading this space" />}
-      >
+      <ErrorBoundary fallback={<ErrorView message="Error loading this space" />}>
         <Suspense fallback={<LoadingView message="Loading..." />}>
           <KnowledgeSpaceChildren nodeId={nodeId} {...handlers} />
         </Suspense>
@@ -67,19 +55,14 @@ export const KnowledgeSpaceView = ({ nodeId }: { nodeId: string }) => {
         open={create.open}
         onOpenChange={(open) => setCreate((prev) => ({ ...prev, open }))}
         onCreated={(created) => {
-          if (created.type === "PAGE")
-            router.push(`/knowledge/${created.id}?edit=1`);
+          if (created.type === "PAGE") router.push(`/knowledge/${created.id}?edit=1`);
         }}
       />
     </div>
   );
 };
 
-const KnowledgeSpaceChildren = ({
-  nodeId,
-  onNewSpace,
-  onNewPage,
-}: { nodeId: string } & CreateHandlers) => {
+const KnowledgeSpaceChildren = ({ nodeId, onNewSpace, onNewPage }: { nodeId: string } & CreateHandlers) => {
   const { data: items } = useListChildren(nodeId);
 
   if (items.length === 0) {

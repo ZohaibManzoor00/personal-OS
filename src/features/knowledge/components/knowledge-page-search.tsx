@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  FileTextIcon,
-  FolderIcon,
-  Loader2Icon,
-  SearchIcon,
-  XIcon,
-} from "lucide-react";
+import { FileTextIcon, FolderIcon, Loader2Icon, SearchIcon, XIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -107,9 +101,7 @@ export const KnowledgePageSearch = ({
               <Loader2Icon className="size-4 animate-spin" />
             </div>
           ) : !data || data.length === 0 ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              No results for "{query}"
-            </div>
+            <div className="py-8 text-center text-sm text-muted-foreground">No results for "{query}"</div>
           ) : (
             data.map((node) => {
               const Icon = node.type === "SPACE" ? FolderIcon : FileTextIcon;
@@ -137,18 +129,13 @@ export const KnowledgePageSearch = ({
                   )}
 
                   <div className="flex min-w-0 flex-1 flex-col">
-                    <ResultBreadcrumbTitle
-                      breadcrumb={node.breadcrumb}
-                      titleHighlight={node.titleHighlight}
-                    />
+                    <ResultBreadcrumbTitle breadcrumb={node.breadcrumb} titleHighlight={node.titleHighlight} />
                     {node.snippet ? (
                       <span className="line-clamp-1 text-xs text-muted-foreground">
                         <Highlighted value={node.snippet} />
                       </span>
                     ) : (
-                      <span className="text-[11px] text-muted-foreground/70">
-                        {node.type === "SPACE" ? "Space" : "Page"}
-                      </span>
+                      <span className="text-[11px] text-muted-foreground/70">{node.type === "SPACE" ? "Space" : "Page"}</span>
                     )}
                   </div>
                 </Link>

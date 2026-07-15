@@ -2,21 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Node as KnowledgeNode } from "@/generated/prisma/client";
 import { useMoveNode, useSpaces } from "../hooks/use-knowledge";
 
@@ -42,11 +29,7 @@ export const KnowledgeMoveDialog = ({ node, open, onOpenChange }: Props) => {
     while (changed) {
       changed = false;
       for (const space of list) {
-        if (
-          !excluded.has(space.id) &&
-          space.parentId &&
-          excluded.has(space.parentId)
-        ) {
+        if (!excluded.has(space.id) && space.parentId && excluded.has(space.parentId)) {
           excluded.add(space.id);
           changed = true;
         }
@@ -56,16 +39,10 @@ export const KnowledgeMoveDialog = ({ node, open, onOpenChange }: Props) => {
     return excluded;
   }, [spaces, node.id]);
 
-  const options = useMemo(
-    () => (spaces ?? []).filter((space) => !excludedIds.has(space.id)),
-    [spaces, excludedIds],
-  );
+  const options = useMemo(() => (spaces ?? []).filter((space) => !excludedIds.has(space.id)), [spaces, excludedIds]);
 
   const handleMove = () => {
-    moveNode.mutate(
-      { id: node.id, parentId: value === ROOT_VALUE ? null : value },
-      { onSuccess: () => onOpenChange(false) },
-    );
+    moveNode.mutate({ id: node.id, parentId: value === ROOT_VALUE ? null : value }, { onSuccess: () => onOpenChange(false) });
   };
 
   return (
@@ -73,9 +50,7 @@ export const KnowledgeMoveDialog = ({ node, open, onOpenChange }: Props) => {
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Move "{node.title}"</DialogTitle>
-          <DialogDescription>
-            Choose a destination space, or move it to the top level.
-          </DialogDescription>
+          <DialogDescription>Choose a destination space, or move it to the top level.</DialogDescription>
         </DialogHeader>
         <Select value={value} onValueChange={setValue} disabled={isLoading}>
           <SelectTrigger className="w-full">
@@ -91,19 +66,10 @@ export const KnowledgeMoveDialog = ({ node, open, onOpenChange }: Props) => {
           </SelectContent>
         </Select>
         <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={moveNode.isPending}
-          >
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={moveNode.isPending}>
             Cancel
           </Button>
-          <Button
-            type="button"
-            onClick={handleMove}
-            disabled={moveNode.isPending}
-          >
+          <Button type="button" onClick={handleMove} disabled={moveNode.isPending}>
             Move
           </Button>
         </DialogFooter>

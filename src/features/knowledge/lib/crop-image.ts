@@ -1,8 +1,4 @@
-import {
-  centerCrop,
-  makeAspectCrop,
-  type PercentCrop,
-} from "react-image-crop";
+import { centerCrop, makeAspectCrop, type PercentCrop } from "react-image-crop";
 
 /** A crop rectangle in source-image pixel coordinates. */
 export type Area = { x: number; y: number; width: number; height: number };
@@ -11,27 +7,15 @@ export type Area = { x: number; y: number; width: number; height: number };
  * A crop covering the whole image. With an aspect ratio it returns the largest
  * centred crop of that ratio; without one it selects the entire image.
  */
-export const fullImageCrop = (
-  aspect: number | undefined,
-  mediaWidth: number,
-  mediaHeight: number,
-): PercentCrop => {
+export const fullImageCrop = (aspect: number | undefined, mediaWidth: number, mediaHeight: number): PercentCrop => {
   if (!aspect) {
     return { unit: "%", x: 0, y: 0, width: 100, height: 100 };
   }
-  return centerCrop(
-    makeAspectCrop({ unit: "%", width: 100 }, aspect, mediaWidth, mediaHeight),
-    mediaWidth,
-    mediaHeight,
-  );
+  return centerCrop(makeAspectCrop({ unit: "%", width: 100 }, aspect, mediaWidth, mediaHeight), mediaWidth, mediaHeight);
 };
 
 /** Converts a react-image-crop percentage crop into source-pixel coordinates. */
-export const percentCropToArea = (
-  crop: PercentCrop,
-  naturalWidth: number,
-  naturalHeight: number,
-): Area => ({
+export const percentCropToArea = (crop: PercentCrop, naturalWidth: number, naturalHeight: number): Area => ({
   x: (crop.x / 100) * naturalWidth,
   y: (crop.y / 100) * naturalHeight,
   width: (crop.width / 100) * naturalWidth,
@@ -41,10 +25,7 @@ export const percentCropToArea = (
 // Cap the exported image so we don't upload a needlessly huge file for a small card thumbnail.
 const MAX_OUTPUT_SIZE = 1024;
 
-const OUTPUT_BY_TYPE: Record<
-  string,
-  { mime: string; ext: string; quality?: number }
-> = {
+const OUTPUT_BY_TYPE: Record<string, { mime: string; ext: string; quality?: number }> = {
   "image/jpeg": { mime: "image/jpeg", ext: "jpg", quality: 0.9 },
   "image/webp": { mime: "image/webp", ext: "webp", quality: 0.9 },
 };
@@ -73,10 +54,7 @@ export const cropImageToFile = async ({
   const image = await loadImage(imageSrc);
   const output = OUTPUT_BY_TYPE[sourceType] ?? DEFAULT_OUTPUT;
 
-  const scale = Math.min(
-    1,
-    MAX_OUTPUT_SIZE / Math.max(area.width, area.height),
-  );
+  const scale = Math.min(1, MAX_OUTPUT_SIZE / Math.max(area.width, area.height));
   const width = Math.max(1, Math.round(area.width * scale));
   const height = Math.max(1, Math.round(area.height * scale));
 
@@ -87,17 +65,7 @@ export const cropImageToFile = async ({
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas is not supported");
 
-  ctx.drawImage(
-    image,
-    area.x,
-    area.y,
-    area.width,
-    area.height,
-    0,
-    0,
-    width,
-    height,
-  );
+  ctx.drawImage(image, area.x, area.y, area.width, area.height, 0, 0, width, height);
 
   const blob = await new Promise<Blob | null>((resolve) => {
     canvas.toBlob(resolve, output.mime, output.quality);

@@ -21,9 +21,7 @@ export const KnowledgeMarkdown = ({ content, className }: { content: string; cla
       <Markdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         components={{
-          a: ({ node, ...props }) => (
-            <a target="_blank" rel="noopener noreferrer" {...props} />
-          ),
+          a: ({ node, ...props }) => <a target="_blank" rel="noopener noreferrer" {...props} />,
           // biome-ignore lint/performance/noImgElement: R2 public asset, no next/image domain config
           img: ({ node, ...props }) => <img loading="lazy" alt="" {...props} />,
         }}

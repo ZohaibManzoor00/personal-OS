@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  CornerUpRightIcon,
-  ImageIcon,
-  MoreHorizontalIcon,
-  PencilIcon,
-  TrashIcon,
-} from "lucide-react";
+import { CornerUpRightIcon, ImageIcon, MoreHorizontalIcon, PencilIcon, TrashIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -66,38 +60,17 @@ export const KnowledgeNodeMenu = ({ node, onDeleted, className }: Props) => {
             {node.images.length > 0 ? "Change image" : "Add image"}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            variant="destructive"
-            onSelect={() => setDeleteOpen(true)}
-          >
+          <DropdownMenuItem variant="destructive" onSelect={() => setDeleteOpen(true)}>
             <TrashIcon className="size-4" />
             Delete
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <KnowledgeNodeDialog
-        mode="rename"
-        node={node}
-        open={renameOpen}
-        onOpenChange={setRenameOpen}
-      />
-      <KnowledgeMoveDialog
-        node={node}
-        open={moveOpen}
-        onOpenChange={setMoveOpen}
-      />
-      <KnowledgeImageDialog
-        node={node}
-        open={imageOpen}
-        onOpenChange={setImageOpen}
-      />
-      <KnowledgeDeleteDialog
-        node={node}
-        open={deleteOpen}
-        onOpenChange={setDeleteOpen}
-        onDeleted={onDeleted}
-      />
+      <KnowledgeNodeDialog mode="rename" node={node} open={renameOpen} onOpenChange={setRenameOpen} />
+      <KnowledgeMoveDialog node={node} open={moveOpen} onOpenChange={setMoveOpen} />
+      <KnowledgeImageDialog node={node} open={imageOpen} onOpenChange={setImageOpen} />
+      <KnowledgeDeleteDialog node={node} open={deleteOpen} onOpenChange={setDeleteOpen} onDeleted={onDeleted} />
     </>
   );
 };

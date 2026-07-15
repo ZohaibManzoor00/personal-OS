@@ -6,11 +6,7 @@ import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import {
-  useAncestors,
-  useKnowledgeNode,
-  useScrollProgress,
-} from "../hooks/use-knowledge";
+import { useAncestors, useKnowledgeNode, useScrollProgress } from "../hooks/use-knowledge";
 import { KnowledgePageSearch } from "./knowledge-page-search";
 
 /**
@@ -42,9 +38,7 @@ export const KnowledgeStickyHeader = ({
   const [bounds, setBounds] = useState<{ left: number; width: number }>();
 
   useEffect(() => {
-    const target =
-      anchorRef.current?.closest<HTMLElement>('[data-slot="sidebar-inset"]') ??
-      null;
+    const target = anchorRef.current?.closest<HTMLElement>('[data-slot="sidebar-inset"]') ?? null;
     if (!target) return;
 
     const update = () => {
@@ -70,9 +64,7 @@ export const KnowledgeStickyHeader = ({
         style={{ left: bounds?.left ?? 0, width: bounds?.width ?? "100%" }}
         className={cn(
           "fixed top-0 z-30 flex h-14 items-center gap-2 border-b border-border/60 bg-background/80 px-4 backdrop-blur-md transition-[transform,opacity] duration-300 ease-out",
-          visible
-            ? "translate-y-0 opacity-100"
-            : "pointer-events-none -translate-y-full opacity-0",
+          visible ? "translate-y-0 opacity-100" : "pointer-events-none -translate-y-full opacity-0",
         )}
       >
         <SidebarTrigger className="-ml-1" />
@@ -85,10 +77,7 @@ export const KnowledgeStickyHeader = ({
           {trail.map((ancestor) => (
             <Fragment key={ancestor.id}>
               <ChevronRightIcon className="size-3 shrink-0" />
-              <Link
-                href={`/knowledge/${ancestor.id}`}
-                className="max-w-32 truncate hover:text-foreground"
-              >
+              <Link href={`/knowledge/${ancestor.id}`} className="max-w-32 truncate hover:text-foreground">
                 {ancestor.title}
               </Link>
             </Fragment>
@@ -96,19 +85,13 @@ export const KnowledgeStickyHeader = ({
           <ChevronRightIcon className="size-3 shrink-0" />
         </nav>
 
-        <span className="min-w-0 flex-1 truncate font-heading text-sm font-semibold tracking-tight">
-          {node.title}
-        </span>
+        <span className="min-w-0 flex-1 truncate font-heading text-sm font-semibold tracking-tight">{node.title}</span>
 
         <span className="ml-3 hidden shrink-0 text-xs text-muted-foreground lg:block">
           Updated {formatDistanceToNow(node.updatedAt, { addSuffix: true })}
         </span>
 
-        <KnowledgePageSearch
-          value={search}
-          onChange={onSearchChange}
-          className="ml-2 w-56 shrink-0"
-        />
+        <KnowledgePageSearch value={search} onChange={onSearchChange} className="ml-2 w-56 shrink-0" />
 
         <div
           aria-hidden

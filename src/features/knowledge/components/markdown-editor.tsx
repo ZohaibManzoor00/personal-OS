@@ -42,10 +42,9 @@ const editorTheme = EditorView.theme({
   ".cm-cursor, .cm-dropCursor": {
     borderLeftColor: "var(--foreground)",
   },
-  "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
-    {
-      backgroundColor: "color-mix(in oklab, var(--primary) 18%, transparent)",
-    },
+  "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
+    backgroundColor: "color-mix(in oklab, var(--primary) 18%, transparent)",
+  },
   ".cm-placeholder": {
     color: "var(--muted-foreground)",
   },
@@ -72,10 +71,8 @@ const editorTheme = EditorView.theme({
   },
 });
 
-const imageFilesFrom = (
-  list: FileList | null | undefined,
-  isImageFile: (file: File) => boolean,
-): File[] => (list ? Array.from(list).filter(isImageFile) : []);
+const imageFilesFrom = (list: FileList | null | undefined, isImageFile: (file: File) => boolean): File[] =>
+  list ? Array.from(list).filter(isImageFile) : [];
 
 export const MarkdownEditor = forwardRef<
   MarkdownEditorHandle,
@@ -90,23 +87,13 @@ export const MarkdownEditor = forwardRef<
     onImageFiles?: (files: File[]) => void;
   }
 >(function MarkdownEditor(
-  {
-    value,
-    onChange,
-    vimMode = false,
-    placeholder: placeholderText,
-    className,
-    autoFocus,
-    isImageFile,
-    onImageFiles,
-  },
+  { value, onChange, vimMode = false, placeholder: placeholderText, className, autoFocus, isImageFile, onImageFiles },
   ref,
 ) {
   const cmRef = useRef<ReactCodeMirrorRef>(null);
 
   useImperativeHandle(ref, () => ({
-    getSelectionHead: () =>
-      cmRef.current?.view?.state.selection.main.head ?? value.length,
+    getSelectionHead: () => cmRef.current?.view?.state.selection.main.head ?? value.length,
     focus: () => cmRef.current?.view?.focus(),
   }));
 

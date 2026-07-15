@@ -37,9 +37,7 @@ export const KnowledgeSearch = () => {
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={(event) => {
           if (event.key !== "Tab" || event.shiftKey) return;
-          const first = document.querySelector<HTMLElement>(
-            "[data-search-result]",
-          );
+          const first = document.querySelector<HTMLElement>("[data-search-result]");
           if (first) {
             event.preventDefault();
             first.focus();

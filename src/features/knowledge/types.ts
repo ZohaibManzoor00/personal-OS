@@ -12,5 +12,4 @@ export type KnowledgeSearchResult = RouterOutput["knowledge"]["search"][number];
 /** A lightweight node (id/title/type/parentId) used to build the folder tree. */
 export type KnowledgeTreeNode = RouterOutput["knowledge"]["listTree"][number];
 
-export const getCoverImage = (node: Pick<KnowledgeNode, "images">) =>
-  node.images.at(0) ?? null;
+export const getCoverImage = (node: Pick<KnowledgeNode, "images">) => node.images.at(0) ?? null;

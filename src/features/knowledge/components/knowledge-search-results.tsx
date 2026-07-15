@@ -31,10 +31,7 @@ const SearchResultCard = ({
     >
       <Card
         size="sm"
-        className={cn(
-          "flex-row gap-3 p-3 transition-colors hover:bg-accent/50",
-          node.snippet ? "items-start" : "items-center",
-        )}
+        className={cn("flex-row gap-3 p-3 transition-colors hover:bg-accent/50", node.snippet ? "items-start" : "items-center")}
       >
         <div className="shrink-0">
           {cover ? (
@@ -76,20 +73,14 @@ export const KnowledgeSearchResults = ({ query }: { query: string }) => {
   const handleKeyDown = (event: React.KeyboardEvent<HTMLAnchorElement>) => {
     if (event.key !== "Tab") return;
 
-    const items = Array.from(
-      containerRef.current?.querySelectorAll<HTMLElement>(
-        "[data-search-result]",
-      ) ?? [],
-    );
+    const items = Array.from(containerRef.current?.querySelectorAll<HTMLElement>("[data-search-result]") ?? []);
     const index = items.indexOf(document.activeElement as HTMLElement);
     if (index === -1) return;
 
     if (event.shiftKey) {
       event.preventDefault();
       if (index === 0) {
-        document
-          .querySelector<HTMLElement>("[data-knowledge-search-input]")
-          ?.focus();
+        document.querySelector<HTMLElement>("[data-knowledge-search-input]")?.focus();
       } else {
         items[index - 1]?.focus();
       }

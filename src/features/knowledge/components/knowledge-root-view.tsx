@@ -25,8 +25,7 @@ export const KnowledgeRootView = () => {
     open: boolean;
     type: "SPACE" | "PAGE";
   }>({ open: false, type: "SPACE" });
-  const openCreate = (type: "SPACE" | "PAGE") =>
-    setCreate({ open: true, type });
+  const openCreate = (type: "SPACE" | "PAGE") => setCreate({ open: true, type });
 
   const handlers: CreateHandlers = {
     onNewSpace: () => openCreate("SPACE"),
@@ -35,11 +34,7 @@ export const KnowledgeRootView = () => {
 
   return (
     <div className="flex flex-col gap-8">
-      <KnowledgeHeader
-        title="Knowledge"
-        description="Your personal knowledge base"
-        {...handlers}
-      />
+      <KnowledgeHeader title="Knowledge" description="Your personal knowledge base" {...handlers} />
       <KnowledgeRecentSection />
 
       <div className="flex items-center justify-between gap-3">
@@ -60,8 +55,7 @@ export const KnowledgeRootView = () => {
         open={create.open}
         onOpenChange={(open) => setCreate((prev) => ({ ...prev, open }))}
         onCreated={(created) => {
-          if (created.type === "PAGE")
-            router.push(`/knowledge/${created.id}?edit=1`);
+          if (created.type === "PAGE") router.push(`/knowledge/${created.id}?edit=1`);
         }}
       />
     </div>

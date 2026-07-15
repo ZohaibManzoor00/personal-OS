@@ -1,18 +1,8 @@
 "use client";
 
-import {
-  expandAllFeature,
-  hotkeysCoreFeature,
-  syncDataLoaderFeature,
-} from "@headless-tree/core";
+import { expandAllFeature, hotkeysCoreFeature, syncDataLoaderFeature } from "@headless-tree/core";
 import { useTree } from "@headless-tree/react";
-import {
-  ChevronsDownUpIcon,
-  ChevronsUpDownIcon,
-  FileTextIcon,
-  FolderIcon,
-  FolderOpenIcon,
-} from "lucide-react";
+import { ChevronsDownUpIcon, ChevronsUpDownIcon, FileTextIcon, FolderIcon, FolderOpenIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Tree, TreeItem, TreeItemLabel } from "@/components/reui/tree";
@@ -48,10 +38,7 @@ export const KnowledgeTree = ({ nodes, rootId }: Props) => {
 
     const countDescendants = (id: string): number => {
       const children = childrenByParent.get(id) ?? [];
-      return children.reduce(
-        (total, childId) => total + 1 + countDescendants(childId),
-        0,
-      );
+      return children.reduce((total, childId) => total + 1 + countDescendants(childId), 0);
     };
 
     const record: Record<string, TreeItemData> = {
@@ -109,11 +96,7 @@ export const KnowledgeTree = ({ nodes, rootId }: Props) => {
     <div className="flex flex-col gap-2">
       <div className="flex justify-end">
         <Button variant="ghost" size="sm" onClick={toggleAll}>
-          {allExpanded ? (
-            <ChevronsDownUpIcon className="size-4" />
-          ) : (
-            <ChevronsUpDownIcon className="size-4" />
-          )}
+          {allExpanded ? <ChevronsDownUpIcon className="size-4" /> : <ChevronsUpDownIcon className="size-4" />}
           {allExpanded ? "Collapse all" : "Expand all"}
         </Button>
       </div>

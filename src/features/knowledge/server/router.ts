@@ -334,9 +334,7 @@ export const knowledgeRouter = createTRPCRouter({
     // from the last time the note was viewed (falling back to updatedAt), so
     // things you actually use recently float up. ts_headline gives us a
     // highlighted title and a body snippet around the matches.
-    const ranked = await prisma.$queryRaw<
-      { id: string; titleHighlight: string; snippet: string | null }[]
-    >`
+    const ranked = await prisma.$queryRaw<{ id: string; titleHighlight: string; snippet: string | null }[]>`
       SELECT
         "id",
         ts_headline('english', "title", to_tsquery('english', ${tsquery}), ${titleHeadlineOpts}) AS "titleHighlight",
@@ -364,9 +362,7 @@ export const knowledgeRouter = createTRPCRouter({
         where: { id: { in: ids } },
         include: coverInclude,
       }),
-      prisma.$queryRaw<
-        { nodeId: string; ancestorId: string; title: string; depth: number }[]
-      >`
+      prisma.$queryRaw<{ nodeId: string; ancestorId: string; title: string; depth: number }[]>`
         WITH RECURSIVE ancestry AS (
           SELECT
             child."id" AS "nodeId",
