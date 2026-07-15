@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  ImagePlusIcon,
-  Loader2Icon,
-  PencilIcon,
-  Trash2Icon,
-} from "lucide-react";
+import { ImagePlusIcon, Loader2Icon, PencilIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -30,16 +25,8 @@ type Props = {
  * background so overlaid content stays legible. Hovering the top-right reveals
  * controls to change or remove the cover.
  */
-export const RouteCover = ({
-  route,
-  title,
-  description,
-  actions,
-  children,
-  className,
-}: Props) => {
-  const { cover, upload, applyDefault, remove, isUploading, isRemoving } =
-    useRouteCover(route);
+export const RouteCover = ({ route, title, description, actions, children, className }: Props) => {
+  const { cover, upload, applyDefault, remove, isUploading, isRemoving } = useRouteCover(route);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const isBusy = isUploading || isRemoving;
@@ -58,20 +45,18 @@ export const RouteCover = ({
       {/* Cover image or a branded placeholder gradient when unset. */}
       {cover ? (
         // biome-ignore lint/performance/noImgElement: R2 public asset, no next/image domain config
-        <img
-          src={cover.url}
-          alt=""
-          className="absolute inset-0 size-full object-cover"
-        />
+        <img src={cover.url} alt="" className="absolute inset-0 size-full object-cover" />
       ) : (
         <div className="absolute inset-0 bg-linear-to-br from-primary/25 via-muted to-accent" />
       )}
 
       {/* Scrim: keep a legible backdrop behind the top-aligned title while still
-          letting the image show through, fading into the page background below. */}
+          letting the image show through. */}
       <div className="absolute inset-0 bg-background/25" />
-      <div className="absolute inset-x-0 top-0 h-24 bg-linear-to-b from-background/60 to-transparent" />
-      <div className="absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-background to-transparent" />
+      {/* Subtle bottom fade so the cover blends softly into the page below.
+          Multi-stop eased gradient avoids the visible banding line a plain
+          two-stop fade produces. */}
+      <div className="absolute inset-x-0 bottom-0 h-2 bg-[linear-gradient(to_top,var(--background)_0%,color-mix(in_oklab,var(--background)_75%,transparent)_25%,color-mix(in_oklab,var(--background)_40%,transparent)_50%,color-mix(in_oklab,var(--background)_15%,transparent)_72%,transparent_100%)]" />
 
       {/* Hover controls, pinned to the top-right of the centered content column
           so they sit in the strip above the title/actions row. */}
@@ -104,11 +89,7 @@ export const RouteCover = ({
               className="bg-background/70 backdrop-blur-sm"
               aria-label="Remove cover"
             >
-              {isRemoving ? (
-                <Loader2Icon className="size-4 animate-spin" />
-              ) : (
-                <Trash2Icon className="size-4" />
-              )}
+              {isRemoving ? <Loader2Icon className="size-4 animate-spin" /> : <Trash2Icon className="size-4" />}
             </Button>
           )}
         </div>
@@ -116,22 +97,14 @@ export const RouteCover = ({
 
       {/* Overlaid content, aligned to the centered page column. The top padding
           leaves room for the hover controls strip so nothing overlaps. */}
-      <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-col px-4 gap-6 pb-16 pt-8 md:pb-24">
+      <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 pt-8 pb-16 md:px-10 md:pb-24">
         {(title || actions) && (
           <div className="flex flex-row items-end justify-between gap-x-4">
             <div className="flex min-w-0 flex-col">
-              {title && (
-                <h1 className="truncate font-heading text-2xl font-semibold tracking-tight md:text-3xl">
-                  {title}
-                </h1>
-              )}
-              {description && (
-                <p className="text-sm text-muted-foreground">{description}</p>
-              )}
+              {title && <h1 className="truncate font-heading text-2xl font-semibold tracking-tight md:text-3xl">{title}</h1>}
+              {description && <p className="text-sm text-muted-foreground">{description}</p>}
             </div>
-            {actions && (
-              <div className="flex shrink-0 items-center gap-2">{actions}</div>
-            )}
+            {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
           </div>
         )}
         {children}

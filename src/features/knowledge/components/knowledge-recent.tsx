@@ -15,7 +15,7 @@ export const KnowledgeRecent = () => {
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-sm font-medium text-muted-foreground">Recently viewed</h2>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {nodes.map((node) => {
           const Icon = node.type === "SPACE" ? FolderIcon : FileTextIcon;
           const cover = getCoverImage(node);
