@@ -1,10 +1,13 @@
 import type { Metadata } from "next";
-import { TRPCReactProvider } from "@/trpc/client";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
+import { cookies } from "next/headers";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
-
+import { ActiveThemeProvider } from "@/components/active-theme";
+import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { DEFAULT_THEME, isValidTheme, THEME_COOKIE_NAME } from "@/lib/themes";
 import { cn } from "@/lib/utils";
+import { TRPCReactProvider } from "@/trpc/client";
 
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,15 +21,43 @@ export const metadata: Metadata = {
   description: "Zo's journey",
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  const cookieStore = await cookies();
+  const cookieTheme = cookieStore.get(THEME_COOKIE_NAME)?.value;
+  const activeTheme = isValidTheme(cookieTheme) ? cookieTheme : DEFAULT_THEME;
+
   return (
     <TRPCReactProvider>
-      <html lang="en" className={cn("h-full", "antialiased", geistSans.variable, geistMono.variable, "font-sans", inter.variable)}>
-        <body className="min-h-full flex flex-col">
-          <NuqsAdapter>
-            <TooltipProvider>{children}</TooltipProvider>
-          </NuqsAdapter>
-          <Toaster />
+      <html
+        lang="en"
+        suppressHydrationWarning
+        className={cn(
+          "h-full",
+          "antialiased",
+          geistSans.variable,
+          geistMono.variable,
+          "font-sans",
+          inter.variable,
+        )}
+      >
+        <body
+          className={cn("min-h-full flex flex-col", `theme-${activeTheme}`)}
+        >
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <ActiveThemeProvider initialTheme={activeTheme}>
+              <NuqsAdapter>
+                <TooltipProvider>{children}</TooltipProvider>
+              </NuqsAdapter>
+              <Toaster />
+            </ActiveThemeProvider>
+          </ThemeProvider>
         </body>
       </html>
     </TRPCReactProvider>

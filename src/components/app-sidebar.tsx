@@ -4,6 +4,7 @@ import { BookIcon, BotIcon, BriefcaseIcon, FolderOpenIcon, HomeIcon, LockIcon, L
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { ThemeSettings } from "@/components/theme-settings";
 import {
   Sidebar,
   SidebarContent,
@@ -86,6 +87,9 @@ export const AppSidebar = () => {
       </SidebarContent>
       <SidebarFooter>
         <SidebarMenu>
+          <SidebarMenuItem>
+            <ThemeSettings />
+          </SidebarMenuItem>
           <SidebarMenuItem>
             {isAuthenticated ? (
               <SidebarMenuButton

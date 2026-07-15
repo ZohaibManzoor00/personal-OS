@@ -106,8 +106,12 @@ export const RouteCover = ({ route, title, description, actions, children, class
           {(title || actions) && (
             <div className="flex flex-row items-end justify-between gap-x-4">
               <div className="flex min-w-0 flex-col">
-                {title && <h1 className="truncate font-heading text-2xl font-semibold tracking-tight md:text-3xl">{title}</h1>}
-                {description && <p className="text-sm text-muted-foreground">{description}</p>}
+                {title && (
+                  <h1 className="text-on-cover truncate font-heading text-2xl font-semibold tracking-tight md:text-3xl">
+                    {title}
+                  </h1>
+                )}
+                {description && <p className="text-on-cover text-sm font-medium text-foreground/80">{description}</p>}
                 {/* {description && <></>} */}
               </div>
               {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
