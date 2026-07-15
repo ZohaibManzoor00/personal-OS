@@ -94,10 +94,6 @@ export const KnowledgeRootView = () => {
 };
 
 const KnowledgeRecentSection = () => {
-  const [params] = useKnowledgeParams();
-
-  if (params.search.trim().length > 0) return null;
-
   return (
     <ErrorBoundary fallback={null}>
       <Suspense fallback={null}>

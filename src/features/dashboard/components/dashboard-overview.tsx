@@ -3,7 +3,6 @@
 import { Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Card } from "@/components/ui/card";
-import { useKnowledgeParams } from "@/features/knowledge/hooks/use-knowledge";
 import { DashboardRecent } from "./dashboard-recent";
 import { DashboardSections } from "./dashboard-sections";
 import { DashboardStats } from "./dashboard-stats";
@@ -24,13 +23,10 @@ const StatsSkeleton = () => (
 
 /**
  * Stats + "jump back in" recents, overlaid inside the dashboard cover banner.
- * Hidden while a global search is active so results take the full view (mirrors
- * how the per-section recents behave on `/learnings`).
+ * Stays visible while searching — only the card list below the cover swaps to
+ * results.
  */
 export const DashboardCoverContent = () => {
-  const [params] = useKnowledgeParams();
-  if (params.search.trim().length > 0) return null;
-
   return (
     <div className="flex flex-col gap-4">
       <ErrorBoundary fallback={null}>
