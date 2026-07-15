@@ -1,5 +1,13 @@
 import { GenericContainer } from "@/components/generic-container";
-import { GlobalSearch, GlobalSearchContent } from "@/features/knowledge/components/global-search";
+import {
+  DashboardCoverContent,
+  DashboardSectionsPanel,
+} from "@/features/dashboard/components/dashboard-overview";
+import { prefetchDashboard } from "@/features/dashboard/server/prefetch";
+import {
+  GlobalSearch,
+  GlobalSearchContent,
+} from "@/features/knowledge/components/global-search";
 import { RouteCover } from "@/features/route-cover/components/route-cover";
 import { prefetchRouteCover } from "@/features/route-cover/server/prefetch";
 import { requireAuth } from "@/lib/auth-utils";
@@ -8,6 +16,7 @@ import { HydrateClient } from "@/trpc/server";
 export default async function DashboardPage() {
   await requireAuth();
   await prefetchRouteCover("dashboard");
+  prefetchDashboard();
   return (
     <HydrateClient>
       <GlobalSearch />
@@ -16,12 +25,14 @@ export default async function DashboardPage() {
           <RouteCover
             route="dashboard"
             title="Welcome back, Zo 👋"
-            description="Your personal OS"
-          />
+            description=""
+          >
+            <DashboardCoverContent />
+          </RouteCover>
         }
       >
         <GlobalSearchContent>
-          <div></div>
+          <DashboardSectionsPanel />
         </GlobalSearchContent>
       </GenericContainer>
     </HydrateClient>
