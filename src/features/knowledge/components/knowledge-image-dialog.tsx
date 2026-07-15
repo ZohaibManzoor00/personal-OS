@@ -2,8 +2,6 @@
 
 import { ImageIcon, Loader2Icon, UploadIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import ReactCrop, { type Crop, type PercentCrop } from "react-image-crop";
-import "react-image-crop/dist/ReactCrop.css";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,16 +12,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useNodeImage } from "../hooks/use-knowledge";
-import {
-  cropImageToFile,
-  fullImageCrop,
-  percentCropToArea,
-} from "../lib/crop-image";
+import { type Area, cropImageToFile } from "../lib/crop-image";
 import { getCoverImage, type KnowledgeNode } from "../types";
+import { ImageCropper } from "./image-cropper";
 
 const ACCEPTED_TYPES = "image/png,image/jpeg,image/webp,image/gif,image/avif";
-// Matches the card cover banner so cropped images fit without distortion.
-const CROP_ASPECT = 16 / 9;
 
 type Pending = { src: string; name: string; type: string };
 
@@ -41,18 +34,14 @@ export const KnowledgeImageDialog = ({ node, open, onOpenChange }: Props) => {
   const isBusy = isUploading || isRemoving;
 
   const [pending, setPending] = useState<Pending | null>(null);
-  const [crop, setCrop] = useState<Crop>();
-  const [completed, setCompleted] = useState<PercentCrop | null>(null);
-  const naturalRef = useRef<{ width: number; height: number } | null>(null);
+  const [area, setArea] = useState<Area | null>(null);
 
   const clearPending = useCallback(() => {
     setPending((prev) => {
       if (prev) URL.revokeObjectURL(prev.src);
       return null;
     });
-    setCrop(undefined);
-    setCompleted(null);
-    naturalRef.current = null;
+    setArea(null);
   }, []);
 
   // Reset any in-progress crop when the dialog closes.
@@ -72,18 +61,8 @@ export const KnowledgeImageDialog = ({ node, open, onOpenChange }: Props) => {
     });
   };
 
-  const onImageLoad = (event: React.SyntheticEvent<HTMLImageElement>) => {
-    const { naturalWidth, naturalHeight, width, height } = event.currentTarget;
-    naturalRef.current = { width: naturalWidth, height: naturalHeight };
-    const initial = fullImageCrop(CROP_ASPECT, width, height);
-    setCrop(initial);
-    setCompleted(initial);
-  };
-
   const handleSave = async () => {
-    const natural = naturalRef.current;
-    if (!pending || !completed || !natural) return;
-    const area = percentCropToArea(completed, natural.width, natural.height);
+    if (!pending || !area) return;
     const file = await cropImageToFile({
       imageSrc: pending.src,
       area,
@@ -101,7 +80,7 @@ export const KnowledgeImageDialog = ({ node, open, onOpenChange }: Props) => {
           <DialogTitle>Cover image</DialogTitle>
           <DialogDescription>
             {pending
-              ? "Drag the edges or corners to frame the 16:9 cover, then save."
+              ? "The whole image is selected by default. Drag any edge or corner to crop, or pick a ratio to lock it."
               : `Add an image to make this ${
                   node.type === "SPACE" ? "space" : "page"
                 } stand out on its card.`}
@@ -109,25 +88,12 @@ export const KnowledgeImageDialog = ({ node, open, onOpenChange }: Props) => {
         </DialogHeader>
 
         {pending ? (
-          <div className="flex max-h-[60vh] justify-center overflow-hidden rounded-xl bg-muted p-2">
-            <ReactCrop
-              crop={crop}
-              aspect={CROP_ASPECT}
-              keepSelection
-              disabled={isUploading}
-              onChange={(_pixelCrop, percentCrop) => setCrop(percentCrop)}
-              onComplete={(_pixelCrop, percentCrop) => setCompleted(percentCrop)}
-              className="max-h-[calc(60vh-1rem)]"
-            >
-              {/* biome-ignore lint/performance/noImgElement: local object URL, cropping preview */}
-              <img
-                src={pending.src}
-                alt={pending.name}
-                onLoad={onImageLoad}
-                className="max-h-[calc(60vh-1rem)] w-auto object-contain"
-              />
-            </ReactCrop>
-          </div>
+          <ImageCropper
+            src={pending.src}
+            alt={pending.name}
+            disabled={isUploading}
+            onAreaChange={setArea}
+          />
         ) : cover ? (
           <div className="flex aspect-video w-full items-center justify-center overflow-hidden rounded-xl border bg-muted/40">
             {/* biome-ignore lint/performance/noImgElement: R2 public asset, no next/image domain config */}
@@ -172,7 +138,7 @@ export const KnowledgeImageDialog = ({ node, open, onOpenChange }: Props) => {
               <Button
                 type="button"
                 onClick={handleSave}
-                disabled={isUploading || !completed}
+                disabled={isUploading || !area}
               >
                 {isUploading ? (
                   <>
