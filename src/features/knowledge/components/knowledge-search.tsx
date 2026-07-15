@@ -3,10 +3,11 @@
 import { SearchIcon, XIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import { useKnowledgeParams, useSearchFocusHotkey } from "../hooks/use-knowledge";
 import { SearchKbd } from "./search-kbd";
 
-export const KnowledgeSearch = () => {
+export const KnowledgeSearch = ({ className }: { className?: string }) => {
   const [params, setParams] = useKnowledgeParams();
   const [value, setValue] = useState(params.search);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -26,7 +27,7 @@ export const KnowledgeSearch = () => {
   }, [value, params.search, setParams]);
 
   return (
-    <div className="relative w-full max-w-md">
+    <div className={cn("relative w-full max-w-md", className)}>
       <SearchIcon className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
       <Input
         ref={inputRef}

@@ -1,4 +1,3 @@
-import { GenericContainer } from "@/components/generic-container";
 import { KnowledgeRootView } from "@/features/knowledge/components/knowledge-root-view";
 import {
   prefetchChildren,
@@ -14,10 +13,8 @@ export default async function KnowledgePage() {
   prefetchRecent();
 
   return (
-    <GenericContainer>
-      <HydrateClient>
-        <KnowledgeRootView />
-      </HydrateClient>
-    </GenericContainer>
+    <HydrateClient>
+      <KnowledgeRootView />
+    </HydrateClient>
   );
 }

@@ -16,9 +16,10 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  sessions Session[]
-  accounts Account[]
-  nodes    Node[]
+  sessions    Session[]
+  accounts    Account[]
+  nodes       Node[]
+  routeCovers RouteCover[]
 
   @@unique([email])
   @@map("user")
@@ -144,4 +145,32 @@ model NodeImage {
 enum NodeType {
   SPACE
   PAGE
+}
+
+/// A full-width cover/banner image for a top-level app route (e.g. the
+/// Dashboard, Knowledge, or Career pages). One per (user, route). Unlike
+/// NodeImage these are not tied to a Node — routes are not database rows.
+model RouteCover {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Route key this cover belongs to, e.g. "dashboard" | "knowledge" | "career".
+  route String
+
+  /// Public URL returned from storage.
+  url String
+
+  /// Storage path/key (useful for deletes & migrations).
+  storageKey String
+
+  width  Int?
+  height Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, route])
+  @@index([userId])
 }

@@ -5,10 +5,10 @@ import { Suspense, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorView, LoadingView } from "@/components/entity-component";
 import { useKnowledgeNode, useListChildren, useRecordView } from "../hooks/use-knowledge";
-import { KnowledgeBreadcrumb } from "./knowledge-breadcrumb";
 import { KnowledgeCollection } from "./knowledge-collection";
 import { KnowledgeEmptyState } from "./knowledge-empty-state";
 import { KnowledgeHeader } from "./knowledge-header";
+import { KnowledgeHeaderBar } from "./knowledge-header-bar";
 import { KnowledgeNodeDialog } from "./knowledge-node-dialog";
 import { KnowledgeNodeMenu } from "./knowledge-node-menu";
 import { KnowledgeViewToggle } from "./knowledge-view-toggle";
@@ -30,6 +30,8 @@ export const KnowledgeSpaceView = ({ nodeId }: { nodeId: string }) => {
   }>({ open: false, type: "PAGE" });
   const openCreate = (type: "SPACE" | "PAGE") => setCreate({ open: true, type });
 
+  const [search, setSearch] = useState("");
+
   const handlers: CreateHandlers = {
     onNewSpace: () => openCreate("SPACE"),
     onNewPage: () => openCreate("PAGE"),
@@ -39,7 +41,7 @@ export const KnowledgeSpaceView = ({ nodeId }: { nodeId: string }) => {
 
   return (
     <div className="flex flex-col gap-8">
-      <KnowledgeBreadcrumb nodeId={nodeId} />
+      <KnowledgeHeaderBar nodeId={nodeId} search={search} onSearchChange={setSearch} />
       <KnowledgeHeader title={node.title} {...handlers} actions={<KnowledgeNodeMenu node={node} onDeleted={goToParent} />} />
 
       <ErrorBoundary fallback={<ErrorView message="Error loading this space" />}>

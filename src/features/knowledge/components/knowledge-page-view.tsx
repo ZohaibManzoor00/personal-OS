@@ -4,11 +4,9 @@ import { useRouter } from "next/navigation";
 import { Suspense, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorView, LoadingView } from "@/components/entity-component";
-import { HeaderPortal } from "@/components/header-portal";
 import { useKnowledgeNode, useRecordView, useScrolledPast } from "../hooks/use-knowledge";
-import { KnowledgeBreadcrumb } from "./knowledge-breadcrumb";
 import { KnowledgeEditor } from "./knowledge-editor";
-import { KnowledgePageSearch } from "./knowledge-page-search";
+import { KnowledgeHeaderBar } from "./knowledge-header-bar";
 import { KnowledgeStickyHeader } from "./knowledge-sticky-header";
 
 export const KnowledgePageView = ({ nodeId }: { nodeId: string }) => {
@@ -21,12 +19,7 @@ export const KnowledgePageView = ({ nodeId }: { nodeId: string }) => {
   return (
     <div className="flex h-full flex-col gap-6">
       <KnowledgeStickyHeader nodeId={nodeId} visible={scrolledPast} search={search} onSearchChange={setSearch} />
-      <HeaderPortal>
-        <div className="min-w-0 flex-1">
-          <KnowledgeBreadcrumb nodeId={nodeId} />
-        </div>
-        <KnowledgePageSearch value={search} onChange={setSearch} className="w-64 shrink-0" />
-      </HeaderPortal>
+      <KnowledgeHeaderBar nodeId={nodeId} search={search} onSearchChange={setSearch} />
       <ErrorBoundary fallback={<ErrorView message="Error loading this page" />}>
         <Suspense fallback={<LoadingView message="Loading..." />}>
           <KnowledgePageContent nodeId={nodeId} headerRef={headerRef} />
