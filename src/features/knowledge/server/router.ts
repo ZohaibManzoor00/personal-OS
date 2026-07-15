@@ -5,9 +5,9 @@ import z from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { deleteObject, getPresignedUploadUrl, getPublicUrl } from "@/lib/r2";
-import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { createTRPCRouter, ownerProcedure, publicProcedure } from "@/trpc/init";
 import { HIGHLIGHT_END, HIGHLIGHT_START } from "../lib/search-highlight";
-import { KNOWLEDGE_SECTIONS } from "../lib/sections";
+import { isSectionLocked, KNOWLEDGE_SECTIONS, LOCKED_SECTIONS } from "../lib/sections";
 import { slugify } from "../lib/slug";
 
 const SEARCH_LIMIT = 20;
@@ -84,51 +84,101 @@ const uniqueSlug = async ({
   }
 };
 
+/**
+ * Whose content the reads serve, plus whether the viewer is the owner. Reads run
+ * as the owner (a read-only public showcase); locked sections and locked nodes
+ * are hidden from everyone but the owner.
+ */
+type ReaderCtx = { ownerUserId: string | null; isOwner: boolean };
+
+/** Prisma `where` fragment that hides locked nodes from non-owners. */
+const lockedFilter = (ctx: ReaderCtx) => (ctx.isOwner ? {} : { locked: false });
+
+/** A locked section is invisible to non-owners (nothing is ever pulled). */
+const sectionHidden = (ctx: ReaderCtx, section: string) => !ctx.isOwner && isSectionLocked(section);
+
+/**
+ * Walks a node's parent chain to check whether any ancestor is locked, so a
+ * non-owner can't reach a node nested inside a locked folder via a direct link.
+ */
+const hasLockedAncestor = async (userId: string, parentId: string | null): Promise<boolean> => {
+  let current = parentId;
+  while (current) {
+    const parent = await prisma.node.findFirst({
+      where: { id: current, userId },
+      select: { parentId: true, locked: true },
+    });
+    if (!parent) break;
+    if (parent.locked) return true;
+    current = parent.parentId;
+  }
+  return false;
+};
+
 export const knowledgeRouter = createTRPCRouter({
-  listChildren: protectedProcedure
+  listChildren: publicProcedure
     .input(z.object({ section: knowledgeSection, parentId: z.string().nullable() }))
     .query(async ({ ctx, input }) => {
+      if (!ctx.ownerUserId || sectionHidden(ctx, input.section)) return [];
       return await prisma.node.findMany({
         where: {
-          userId: ctx.auth.user.id,
+          userId: ctx.ownerUserId,
           section: input.section,
           parentId: input.parentId,
           archivedAt: null,
+          ...lockedFilter(ctx),
         },
         orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
         include: coverInclude,
       });
     }),
 
-  get: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
-    return await prisma.node.findFirstOrThrow({
-      where: { id: input.id, userId: ctx.auth.user.id },
+  get: publicProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
+    if (!ctx.ownerUserId) throw new TRPCError({ code: "NOT_FOUND" });
+
+    const node = await prisma.node.findFirst({
+      where: { id: input.id, userId: ctx.ownerUserId },
       include: coverInclude,
     });
+    if (!node) throw new TRPCError({ code: "NOT_FOUND" });
+
+    // Non-owners can never open locked content, a locked section, or anything
+    // nested inside a locked folder.
+    if (!ctx.isOwner) {
+      if (node.locked || isSectionLocked(node.section) || (await hasLockedAncestor(ctx.ownerUserId, node.parentId))) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+    }
+
+    return node;
   }),
 
-  listSpaces: protectedProcedure.input(z.object({ section: knowledgeSection })).query(async ({ ctx, input }) => {
+  listSpaces: publicProcedure.input(z.object({ section: knowledgeSection })).query(async ({ ctx, input }) => {
+    if (!ctx.ownerUserId || sectionHidden(ctx, input.section)) return [];
     return await prisma.node.findMany({
-      where: { userId: ctx.auth.user.id, section: input.section, type: "SPACE", archivedAt: null },
+      where: { userId: ctx.ownerUserId, section: input.section, type: "SPACE", archivedAt: null, ...lockedFilter(ctx) },
       orderBy: { title: "asc" },
     });
   }),
 
-  listTree: protectedProcedure.input(z.object({ section: knowledgeSection })).query(async ({ ctx, input }) => {
+  listTree: publicProcedure.input(z.object({ section: knowledgeSection })).query(async ({ ctx, input }) => {
+    if (!ctx.ownerUserId || sectionHidden(ctx, input.section)) return [];
     return await prisma.node.findMany({
-      where: { userId: ctx.auth.user.id, section: input.section, archivedAt: null },
+      where: { userId: ctx.ownerUserId, section: input.section, archivedAt: null, ...lockedFilter(ctx) },
       orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
       select: { id: true, title: true, type: true, parentId: true },
     });
   }),
 
-  listRecent: protectedProcedure.input(z.object({ section: knowledgeSection })).query(async ({ ctx, input }) => {
+  listRecent: publicProcedure.input(z.object({ section: knowledgeSection })).query(async ({ ctx, input }) => {
+    if (!ctx.ownerUserId || sectionHidden(ctx, input.section)) return [];
     return await prisma.node.findMany({
       where: {
-        userId: ctx.auth.user.id,
+        userId: ctx.ownerUserId,
         section: input.section,
         archivedAt: null,
         lastViewedAt: { not: null },
+        ...lockedFilter(ctx),
       },
       orderBy: { lastViewedAt: "desc" },
       take: RECENT_LIMIT,
@@ -136,19 +186,24 @@ export const knowledgeRouter = createTRPCRouter({
     });
   }),
 
-  recordView: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
+  recordView: publicProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
+    // Only the owner's own views count — non-owners browsing the showcase must
+    // not bump the owner's "recently viewed".
+    if (!ctx.isOwner || !ctx.ownerUserId) return { id: input.id };
+
     // Raw update so we only touch lastViewedAt — a Prisma update would also bump the @updatedAt column.
     await prisma.$executeRaw`
       UPDATE "Node"
       SET "lastViewedAt" = NOW()
-      WHERE "id" = ${input.id} AND "userId" = ${ctx.auth.user.id}
+      WHERE "id" = ${input.id} AND "userId" = ${ctx.ownerUserId}
     `;
 
     return { id: input.id };
   }),
 
-  getAncestors: protectedProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
-    const userId = ctx.auth.user.id;
+  getAncestors: publicProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
+    const userId = ctx.ownerUserId;
+    if (!userId) throw new TRPCError({ code: "NOT_FOUND" });
 
     const node = await prisma.node.findFirst({
       where: { id: input.id, userId },
@@ -167,10 +222,15 @@ export const knowledgeRouter = createTRPCRouter({
       parentId = parent.parentId;
     }
 
+    // A non-owner may not see the trail of anything locked anywhere in the chain.
+    if (!ctx.isOwner && ancestors.some((n) => n.locked || isSectionLocked(n.section))) {
+      throw new TRPCError({ code: "NOT_FOUND" });
+    }
+
     return ancestors;
   }),
 
-  create: protectedProcedure
+  create: ownerProcedure
     .input(
       z.object({
         section: knowledgeSection,
@@ -222,7 +282,7 @@ export const knowledgeRouter = createTRPCRouter({
       });
     }),
 
-  update: protectedProcedure
+  update: ownerProcedure
     .input(
       z.object({
         id: z.string(),
@@ -257,7 +317,21 @@ export const knowledgeRouter = createTRPCRouter({
       });
     }),
 
-  delete: protectedProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
+  setLocked: ownerProcedure.input(z.object({ id: z.string(), locked: z.boolean() })).mutation(async ({ ctx, input }) => {
+    const userId = ctx.auth.user.id;
+
+    await prisma.node.findFirstOrThrow({
+      where: { id: input.id, userId },
+      select: { id: true },
+    });
+
+    return await prisma.node.update({
+      where: { id: input.id },
+      data: { locked: input.locked },
+    });
+  }),
+
+  delete: ownerProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
     const userId = ctx.auth.user.id;
 
     const node = await prisma.node.findFirst({
@@ -270,7 +344,7 @@ export const knowledgeRouter = createTRPCRouter({
     return node;
   }),
 
-  move: protectedProcedure.input(z.object({ id: z.string(), parentId: z.string().nullable() })).mutation(async ({ ctx, input }) => {
+  move: ownerProcedure.input(z.object({ id: z.string(), parentId: z.string().nullable() })).mutation(async ({ ctx, input }) => {
     const userId = ctx.auth.user.id;
 
     if (input.parentId === input.id)
@@ -332,7 +406,14 @@ export const knowledgeRouter = createTRPCRouter({
     });
   }),
 
-  search: protectedProcedure.input(z.object({ section: knowledgeSection.optional(), query: z.string() })).query(async ({ ctx, input }) => {
+  search: publicProcedure.input(z.object({ section: knowledgeSection.optional(), query: z.string() })).query(async ({ ctx, input }) => {
+    if (!ctx.ownerUserId) return [];
+
+    // Non-owners can never match locked nodes or nodes in a locked section.
+    const lockedSql = ctx.isOwner
+      ? Prisma.empty
+      : Prisma.sql`AND "locked" = false AND "section" NOT IN (${Prisma.join([...LOCKED_SECTIONS])})`;
+
     // Turn the raw input into a prefix tsquery: strip tsquery operators so user
     // input can't break the syntax, treat each word as a prefix (`:*`) so
     // search-as-you-type matches partial words, and AND the terms together.
@@ -368,8 +449,9 @@ export const knowledgeRouter = createTRPCRouter({
         ts_headline('english', "title", to_tsquery('english', ${tsquery}), ${titleHeadlineOpts}) AS "titleHighlight",
         ts_headline('english', coalesce("body", ''), to_tsquery('english', ${tsquery}), ${snippetHeadlineOpts}) AS "snippet"
       FROM "Node"
-      WHERE "userId" = ${ctx.auth.user.id}
+      WHERE "userId" = ${ctx.ownerUserId}
         AND "archivedAt" IS NULL
+        ${lockedSql}
         AND "searchVector" @@ to_tsquery('english', ${tsquery})
       ORDER BY
         -- Hits in the section you're currently browsing always rank above the
@@ -404,7 +486,7 @@ export const knowledgeRouter = createTRPCRouter({
             1 AS depth
           FROM "Node" child
           JOIN "Node" parent ON parent."id" = child."parentId"
-          WHERE child."id" IN (${Prisma.join(ids)}) AND child."userId" = ${ctx.auth.user.id}
+          WHERE child."id" IN (${Prisma.join(ids)}) AND child."userId" = ${ctx.ownerUserId}
           UNION ALL
           SELECT
             a."nodeId",
@@ -447,7 +529,7 @@ export const knowledgeRouter = createTRPCRouter({
       .filter((row) => row !== undefined);
   }),
 
-  createImageUploadUrl: protectedProcedure
+  createImageUploadUrl: ownerProcedure
     .input(z.object({ nodeId: z.string(), contentType: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const userId = ctx.auth.user.id;
@@ -483,7 +565,7 @@ export const knowledgeRouter = createTRPCRouter({
       return { uploadUrl, key, publicUrl: getPublicUrl(key) };
     }),
 
-  attachImage: protectedProcedure
+  attachImage: ownerProcedure
     .input(
       z.object({
         nodeId: z.string(),
@@ -534,7 +616,7 @@ export const knowledgeRouter = createTRPCRouter({
       return image;
     }),
 
-  removeImage: protectedProcedure.input(z.object({ nodeId: z.string() })).mutation(async ({ ctx, input }) => {
+  removeImage: ownerProcedure.input(z.object({ nodeId: z.string() })).mutation(async ({ ctx, input }) => {
     const userId = ctx.auth.user.id;
 
     await prisma.node.findFirstOrThrow({
@@ -556,7 +638,7 @@ export const knowledgeRouter = createTRPCRouter({
     return { nodeId: input.nodeId };
   }),
 
-  polishMarkdown: protectedProcedure.input(z.object({ text: z.string().min(1).max(FORMAT_MAX_CHARS) })).mutation(async ({ input }) => {
+  polishMarkdown: ownerProcedure.input(z.object({ text: z.string().min(1).max(FORMAT_MAX_CHARS) })).mutation(async ({ input }) => {
     try {
       // generateObject forces a schema-shaped response, so we always get back
       // the formatted document in a known field — no stray commentary or

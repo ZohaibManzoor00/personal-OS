@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import z from "zod";
 import { prisma } from "@/lib/db";
 import { deleteObject, getPresignedUploadUrl, getPublicUrl } from "@/lib/r2";
-import { createTRPCRouter, protectedProcedure } from "@/trpc/init";
+import { createTRPCRouter, ownerProcedure, publicProcedure } from "@/trpc/init";
 import { ROUTE_COVER_KEYS } from "../lib/routes";
 
 const routeKey = z.enum(ROUTE_COVER_KEYS);
@@ -21,14 +21,15 @@ const buildCoverKey = ({ userId, route, contentType }: { userId: string; route: 
 };
 
 export const routeCoverRouter = createTRPCRouter({
-  get: protectedProcedure.input(z.object({ route: routeKey })).query(async ({ ctx, input }) => {
-    const userId = ctx.auth.user.id;
+  get: publicProcedure.input(z.object({ route: routeKey })).query(async ({ ctx, input }) => {
+    const userId = ctx.ownerUserId;
+    if (!userId) return null;
     return prisma.routeCover.findUnique({
       where: { userId_route: { userId, route: input.route } },
     });
   }),
 
-  createUploadUrl: protectedProcedure.input(z.object({ route: routeKey, contentType: z.string() })).mutation(async ({ ctx, input }) => {
+  createUploadUrl: ownerProcedure.input(z.object({ route: routeKey, contentType: z.string() })).mutation(async ({ ctx, input }) => {
     const userId = ctx.auth.user.id;
 
     if (!(input.contentType in IMAGE_EXTENSIONS)) {
@@ -58,7 +59,7 @@ export const routeCoverRouter = createTRPCRouter({
     return { uploadUrl, key, publicUrl: getPublicUrl(key) };
   }),
 
-  attach: protectedProcedure
+  attach: ownerProcedure
     .input(
       z.object({
         route: routeKey,
@@ -106,7 +107,7 @@ export const routeCoverRouter = createTRPCRouter({
       });
     }),
 
-  remove: protectedProcedure.input(z.object({ route: routeKey })).mutation(async ({ ctx, input }) => {
+  remove: ownerProcedure.input(z.object({ route: routeKey })).mutation(async ({ ctx, input }) => {
     const userId = ctx.auth.user.id;
 
     const existing = await prisma.routeCover.findUnique({

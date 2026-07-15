@@ -377,6 +377,24 @@ export const useDeleteNode = () => {
   );
 };
 
+export const useSetNodeLocked = () => {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    trpc.knowledge.setLocked.mutationOptions({
+      onSuccess: (data) => {
+        queryClient.invalidateQueries(trpc.knowledge.get.queryFilter({ id: data.id }));
+        queryClient.invalidateQueries(trpc.knowledge.listChildren.queryFilter());
+        queryClient.invalidateQueries(trpc.knowledge.listTree.queryFilter());
+      },
+      onError: (error) => {
+        toast.error(`Failed to update lock: ${error.message}`);
+      },
+    }),
+  );
+};
+
 export const useNodeImage = (nodeId: string) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

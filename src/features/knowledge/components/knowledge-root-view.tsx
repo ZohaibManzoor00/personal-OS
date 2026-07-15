@@ -6,6 +6,7 @@ import { Suspense, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorView, LoadingView } from "@/components/entity-component";
 import { HeaderPortal } from "@/components/header-portal";
+import { useIsOwner } from "@/features/auth/hooks/use-is-owner";
 import { Button } from "@/components/ui/button";
 import { RouteCover } from "@/features/route-cover/components/route-cover";
 import { useKnowledgeParams, useListChildren } from "../hooks/use-knowledge";
@@ -26,6 +27,7 @@ type CreateHandlers = {
 export const KnowledgeRootView = () => {
   const router = useRouter();
   const section = useKnowledgeSection();
+  const { isOwner } = useIsOwner();
   const [create, setCreate] = useState<{
     open: boolean;
     type: "SPACE" | "PAGE";
@@ -49,16 +51,18 @@ export const KnowledgeRootView = () => {
         title={section.cover.title}
         description={section.cover.description}
         actions={
-          <>
-            <Button variant="outline" size="sm" onClick={handlers.onNewSpace}>
-              <FolderPlusIcon className="size-4" />
-              <span className="hidden sm:inline">New space</span>
-            </Button>
-            <Button size="sm" onClick={handlers.onNewPage}>
-              <FilePlusIcon className="size-4" />
-              <span className="hidden sm:inline">New page</span>
-            </Button>
-          </>
+          isOwner ? (
+            <>
+              <Button variant="outline" size="sm" onClick={handlers.onNewSpace}>
+                <FolderPlusIcon className="size-4" />
+                <span className="hidden sm:inline">New space</span>
+              </Button>
+              <Button size="sm" onClick={handlers.onNewPage}>
+                <FilePlusIcon className="size-4" />
+                <span className="hidden sm:inline">New page</span>
+              </Button>
+            </>
+          ) : null
         }
       >
         <KnowledgeRecentSection />

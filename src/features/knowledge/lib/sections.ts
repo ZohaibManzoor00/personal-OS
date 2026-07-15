@@ -16,6 +16,17 @@ export const isKnowledgeSection = (value: string): value is KnowledgeSection =>
   (KNOWLEDGE_SECTIONS as readonly string[]).includes(value);
 
 /**
+ * Sections that are "locked" (personal). Their content is never served to
+ * anyone but the owner, and the sidebar shows a lock icon next to them. Edit
+ * this list to lock/unlock a whole section.
+ */
+export const LOCKED_SECTIONS: readonly KnowledgeSection[] = ["workflows"];
+
+/** Whether a raw section string is locked (personal, owner-only). */
+export const isSectionLocked = (section: string): boolean =>
+  (LOCKED_SECTIONS as readonly string[]).includes(section);
+
+/**
  * All the route-specific bits the shared knowledge components need: where links
  * point, what the header/cover say, and which cover image row to load. Threaded
  * through the UI via `KnowledgeSectionProvider` so no component hardcodes a

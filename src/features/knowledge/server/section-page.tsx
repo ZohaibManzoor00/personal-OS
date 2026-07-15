@@ -1,13 +1,13 @@
 import { notFound } from "next/navigation";
 import { GenericContainer } from "@/components/generic-container";
 import { prefetchRouteCover } from "@/features/route-cover/server/prefetch";
-import { requireAuth } from "@/lib/auth-utils";
+import { getIsOwner } from "@/lib/auth-utils";
 import { getQueryClient, HydrateClient, trpc } from "@/trpc/server";
 import { KnowledgePageView } from "../components/knowledge-page-view";
 import { KnowledgeRootView } from "../components/knowledge-root-view";
 import { KnowledgeSectionProvider } from "../components/knowledge-section-context";
 import { KnowledgeSpaceView } from "../components/knowledge-space-view";
-import { getKnowledgeSectionConfig, type KnowledgeSection } from "../lib/sections";
+import { getKnowledgeSectionConfig, isSectionLocked, type KnowledgeSection } from "../lib/sections";
 import { prefetchAncestors, prefetchChildren, prefetchRecent } from "./prefetch";
 
 /**
@@ -16,7 +16,9 @@ import { prefetchAncestors, prefetchChildren, prefetchRecent } from "./prefetch"
  * differs between routes.
  */
 export const KnowledgeSectionRootPage = async ({ section }: { section: KnowledgeSection }) => {
-  await requireAuth();
+  // Locked (personal) sections are unavailable to everyone but the owner.
+  if (isSectionLocked(section) && !(await getIsOwner())) notFound();
+
   const config = getKnowledgeSectionConfig(section);
 
   prefetchChildren(section, null);
@@ -38,7 +40,8 @@ export const KnowledgeSectionRootPage = async ({ section }: { section: Knowledge
  * route.
  */
 export const KnowledgeSectionNodePage = async ({ section, nodeId }: { section: KnowledgeSection; nodeId: string }) => {
-  await requireAuth();
+  if (isSectionLocked(section) && !(await getIsOwner())) notFound();
+
   const config = getKnowledgeSectionConfig(section);
 
   const queryClient = getQueryClient();

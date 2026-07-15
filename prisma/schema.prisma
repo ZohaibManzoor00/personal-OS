@@ -93,6 +93,10 @@ model Node {
   /// Manual ordering of siblings
   sortOrder Int @default(0)
 
+  /// When true this node (and its subtree) is personal: only the owner can see
+  /// or open it. Non-owner reads never pull locked nodes.
+  locked Boolean @default(false)
+
   /// Emoji or icon name
   icon String?
 

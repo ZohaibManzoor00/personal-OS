@@ -1,7 +1,7 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { FileTextIcon, FolderIcon } from "lucide-react";
+import { FileTextIcon, FolderIcon, LockIcon } from "lucide-react";
 import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -48,6 +48,16 @@ export const KnowledgeCard = ({ node }: { node: KnowledgeNode }) => {
           <Icon className="size-8 text-muted-foreground transition-colors group-hover/card:text-foreground" />
         )}
       </div>
+
+      {node.locked && (
+        <span
+          className="absolute top-1.5 left-1.5 z-10 flex items-center gap-1 rounded-md bg-background/70 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground backdrop-blur-sm"
+          title="Personal — only visible to you"
+        >
+          <LockIcon className="size-3" />
+          Personal
+        </span>
+      )}
 
       <KnowledgeNodeMenu
         node={node}
