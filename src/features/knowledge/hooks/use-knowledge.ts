@@ -269,6 +269,16 @@ export const useKnowledgeSearch = (query: string) => {
   return useQuery(trpc.knowledge.search.queryOptions({ section, query }, { enabled: query.trim().length > 0 }));
 };
 
+/**
+ * Section-agnostic search across every knowledge hub. Unlike `useKnowledgeSearch`
+ * it needs no `KnowledgeSectionProvider`, so it can power a global entry point
+ * like the dashboard header.
+ */
+export const useGlobalSearch = (query: string) => {
+  const trpc = useTRPC();
+  return useQuery(trpc.knowledge.search.queryOptions({ query }, { enabled: query.trim().length > 0 }));
+};
+
 export const useCreateNode = () => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

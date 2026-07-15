@@ -13,7 +13,7 @@ import { getCoverImage, type KnowledgeSearchResult } from "../types";
 import { Highlighted, ResultBreadcrumbTitle } from "./knowledge-highlight";
 import { useKnowledgeSection } from "./knowledge-section-context";
 
-const SearchResultCard = ({
+export const SearchResultCard = ({
   node,
   onKeyDown,
 }: {

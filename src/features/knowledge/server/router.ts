@@ -332,7 +332,7 @@ export const knowledgeRouter = createTRPCRouter({
     });
   }),
 
-  search: protectedProcedure.input(z.object({ section: knowledgeSection, query: z.string() })).query(async ({ ctx, input }) => {
+  search: protectedProcedure.input(z.object({ section: knowledgeSection.optional(), query: z.string() })).query(async ({ ctx, input }) => {
     // Turn the raw input into a prefix tsquery: strip tsquery operators so user
     // input can't break the syntax, treat each word as a prefix (`:*`) so
     // search-as-you-type matches partial words, and AND the terms together.
@@ -350,6 +350,11 @@ export const knowledgeRouter = createTRPCRouter({
     // them to render <mark> spans without injecting raw HTML.
     const titleHeadlineOpts = `StartSel=${HIGHLIGHT_START}, StopSel=${HIGHLIGHT_END}, HighlightAll=TRUE`;
     const snippetHeadlineOpts = `StartSel=${HIGHLIGHT_START}, StopSel=${HIGHLIGHT_END}, MaxFragments=2, MinWords=5, MaxWords=18`;
+
+    // When a section is given (browsing within a hub) its hits rank above the
+    // rest; global search (e.g. the dashboard) omits it so all sections compete
+    // purely on relevance.
+    const sectionBoost = input.section ? Prisma.sql`("section" = ${input.section}) DESC,` : Prisma.empty;
 
     // Rank against the GIN-indexed generated tsvector. ts_rank_cd rewards
     // proximity/density and title hits outrank body hits via the 'A'/'B' column
@@ -370,7 +375,7 @@ export const knowledgeRouter = createTRPCRouter({
         -- Hits in the section you're currently browsing always rank above the
         -- rest, then relevance (proximity/density + a recency boost) decides the
         -- order within each group.
-        ("section" = ${input.section}) DESC,
+        ${sectionBoost}
         ts_rank_cd("searchVector", to_tsquery('english', ${tsquery}))
           + 0.3 * exp(-EXTRACT(EPOCH FROM (NOW() - COALESCE("lastViewedAt", "updatedAt"))) / (86400.0 * 30.0)) DESC,
         "updatedAt" DESC

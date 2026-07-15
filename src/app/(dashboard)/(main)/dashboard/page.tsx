@@ -1,4 +1,5 @@
 import { GenericContainer } from "@/components/generic-container";
+import { GlobalSearch, GlobalSearchContent } from "@/features/knowledge/components/global-search";
 import { RouteCover } from "@/features/route-cover/components/route-cover";
 import { prefetchRouteCover } from "@/features/route-cover/server/prefetch";
 import { requireAuth } from "@/lib/auth-utils";
@@ -9,16 +10,19 @@ export default async function DashboardPage() {
   await prefetchRouteCover("dashboard");
   return (
     <HydrateClient>
+      <GlobalSearch />
       <GenericContainer
         cover={
           <RouteCover
             route="dashboard"
-            title="Dashboard"
-            description="Create and manage your dashboard"
+            title="Welcome back, Zo 👋"
+            description="Your personal OS"
           />
         }
       >
-        <div>This is where the content will go</div>
+        <GlobalSearchContent>
+          <div></div>
+        </GlobalSearchContent>
       </GenericContainer>
     </HydrateClient>
   );
