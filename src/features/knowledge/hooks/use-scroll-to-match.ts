@@ -4,36 +4,31 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { MATCH_PARAM } from "../lib/search-navigation";
 
-const HIGHLIGHT_NAME = "knowledge-search-match";
 // Clears the fixed sticky header (h-14) so the match isn't hidden under it —
 // matches the `scroll-mt-24` applied to headings.
 const SCROLL_OFFSET = 96;
 // Give the body (and any images shifting layout) a few frames to settle before
 // giving up on finding the match.
 const MAX_FRAMES = 30;
+const FLASH_CLASS = "knowledge-match-flash";
+const FLASH_DURATION = 1800;
+const BLOCK_SELECTOR = "p, li, h1, h2, h3, h4, h5, h6, blockquote, td, th, pre";
 
 const highlightAndScroll = (range: Range) => {
   const rect = range.getBoundingClientRect();
   const top = window.scrollY + rect.top - SCROLL_OFFSET;
   window.scrollTo({ top: Math.max(top, 0), behavior: "smooth" });
 
-  // Precise, non-destructive highlight over the exact matched text via the CSS
-  // Custom Highlight API (no DOM mutation, so it never fights React).
-  const highlights = (CSS as unknown as { highlights?: Map<string, unknown> }).highlights;
-  const HighlightCtor = (window as unknown as { Highlight?: new (range: Range) => unknown }).Highlight;
-  if (highlights && HighlightCtor) {
-    highlights.set(HIGHLIGHT_NAME, new HighlightCtor(range));
-    window.setTimeout(() => highlights.delete(HIGHLIGHT_NAME), 2600);
-    return;
-  }
+  // Flash the heading/block that contains the match with a yellow fade so the
+  // eye lands on it. Toggling the class (with a reflow) restarts the animation
+  // if the same block is targeted again.
+  const block = range.startContainer.parentElement?.closest<HTMLElement>(BLOCK_SELECTOR);
+  if (!block) return;
 
-  // Fallback for browsers without the Custom Highlight API: briefly flash the
-  // block that contains the match.
-  const block = range.startContainer.parentElement?.closest("p, li, h1, h2, h3, h4, blockquote, td, th, pre");
-  if (block) {
-    block.classList.add("knowledge-match-flash");
-    window.setTimeout(() => block.classList.remove("knowledge-match-flash"), 2400);
-  }
+  block.classList.remove(FLASH_CLASS);
+  void block.getBoundingClientRect();
+  block.classList.add(FLASH_CLASS);
+  window.setTimeout(() => block.classList.remove(FLASH_CLASS), FLASH_DURATION);
 };
 
 /** Scrolls to the earliest occurrence of any term within `root`. */
@@ -98,7 +93,7 @@ export const useScrollToMatch = (rootSelector: string) => {
       if (cancelled) return;
 
       const root = document.querySelector<HTMLElement>(rootSelector);
-      if (!root || !root.textContent?.trim()) {
+      if (!root?.textContent?.trim()) {
         if (frames++ < MAX_FRAMES) requestAnimationFrame(run);
         else clear();
         return;
