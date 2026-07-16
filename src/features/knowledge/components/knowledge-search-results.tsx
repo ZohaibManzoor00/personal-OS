@@ -8,16 +8,18 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useKnowledgeSearch } from "../hooks/use-knowledge";
 import { groupSearchResultsBySection } from "../lib/group-results";
-import { resolveSectionBasePath } from "../lib/sections";
+import { buildNodeHref } from "../lib/search-navigation";
 import { getCoverImage, type KnowledgeSearchResult } from "../types";
 import { Highlighted, ResultBreadcrumbTitle } from "./knowledge-highlight";
 import { useKnowledgeSection } from "./knowledge-section-context";
 
 export const SearchResultCard = ({
   node,
+  query,
   onKeyDown,
 }: {
   node: KnowledgeSearchResult;
+  query: string;
   onKeyDown: React.KeyboardEventHandler<HTMLAnchorElement>;
 }) => {
   const Icon = node.type === "SPACE" ? FolderIcon : FileTextIcon;
@@ -26,7 +28,7 @@ export const SearchResultCard = ({
 
   return (
     <Link
-      href={`${resolveSectionBasePath(node.section)}/${node.id}`}
+      href={buildNodeHref(node.section, node.id, node.type === "PAGE" ? query : undefined)}
       prefetch
       data-search-result
       onKeyDown={onKeyDown}
@@ -123,7 +125,7 @@ export const KnowledgeSearchResults = ({ query }: { query: string }) => {
             </h3>
           )}
           {group.results.map((node) => (
-            <SearchResultCard key={node.id} node={node} onKeyDown={handleKeyDown} />
+            <SearchResultCard key={node.id} node={node} query={query} onKeyDown={handleKeyDown} />
           ))}
         </div>
       ))}

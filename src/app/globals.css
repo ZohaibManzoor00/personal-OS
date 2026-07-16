@@ -303,3 +303,25 @@
       0 0 16px var(--background);
   }
 }
+
+/* "Jump to first match" when a page is opened from search: a precise highlight
+ * over the matched text (CSS Custom Highlight API), with a soft block flash as
+ * a fallback for browsers that lack it. */
+::highlight(knowledge-search-match) {
+  background-color: color-mix(in oklch, var(--primary) 30%, transparent);
+  color: var(--foreground);
+}
+
+@keyframes knowledge-match-flash {
+  from {
+    background-color: color-mix(in oklch, var(--primary) 25%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+.knowledge-match-flash {
+  border-radius: var(--radius);
+  animation: knowledge-match-flash 2.4s ease-out;
+}

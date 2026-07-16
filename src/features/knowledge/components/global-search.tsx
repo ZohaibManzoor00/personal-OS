@@ -144,6 +144,7 @@ export const GlobalSearchResults = ({ query }: { query: string }) => {
             <SearchResultCard
               key={node.id}
               node={node}
+              query={query}
               onKeyDown={handleKeyDown}
             />
           ))}

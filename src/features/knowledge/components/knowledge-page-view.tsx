@@ -5,6 +5,7 @@ import { Suspense, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { ErrorView, LoadingView } from "@/components/entity-component";
 import { useKnowledgeNode, useRecordView, useScrolledPast } from "../hooks/use-knowledge";
+import { useScrollToMatch } from "../hooks/use-scroll-to-match";
 import { KnowledgeEditor } from "./knowledge-editor";
 import { KnowledgeHeaderBar } from "./knowledge-header-bar";
 import { useKnowledgeSection } from "./knowledge-section-context";
@@ -37,6 +38,7 @@ const KnowledgePageContent = ({ nodeId, headerRef }: { nodeId: string; headerRef
   const { data: node } = useKnowledgeNode(nodeId);
 
   useRecordView(nodeId);
+  useScrollToMatch("[data-knowledge-body]");
 
   const goToParent = () => router.push(node.parentId ? `${section.basePath}/${node.parentId}` : section.basePath);
 

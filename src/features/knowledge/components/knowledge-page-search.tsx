@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useKnowledgeSearch, useSearchFocusHotkey } from "../hooks/use-knowledge";
 import { groupSearchResultsBySection } from "../lib/group-results";
-import { resolveSectionBasePath } from "../lib/sections";
+import { buildNodeHref } from "../lib/search-navigation";
 import { getCoverImage } from "../types";
 import { Highlighted, ResultBreadcrumbTitle } from "./knowledge-highlight";
 import { useKnowledgeSection } from "./knowledge-section-context";
@@ -125,7 +125,7 @@ export const KnowledgePageSearch = ({
                   return (
                     <Link
                       key={node.id}
-                      href={`${resolveSectionBasePath(node.section)}/${node.id}`}
+                      href={buildNodeHref(node.section, node.id, node.type === "PAGE" ? query : undefined)}
                       prefetch
                       onClick={() => setFocused(false)}
                       className="flex items-start gap-2.5 rounded-md px-2.5 py-2 transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
