@@ -23,6 +23,7 @@ export const KnowledgeMarkdown = ({ content, className }: { content: string; cla
     >
       <Markdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
+        rehypePlugins={[rehypeSlug]}
         components={{
           a: ({ node, ...props }) => <a target="_blank" rel="noopener noreferrer" {...props} />,
           // biome-ignore lint/performance/noImgElement: R2 public asset, no next/image domain config

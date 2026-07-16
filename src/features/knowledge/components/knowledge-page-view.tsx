@@ -9,6 +9,7 @@ import { KnowledgeEditor } from "./knowledge-editor";
 import { KnowledgeHeaderBar } from "./knowledge-header-bar";
 import { useKnowledgeSection } from "./knowledge-section-context";
 import { KnowledgeStickyHeader } from "./knowledge-sticky-header";
+import { KnowledgeToc } from "./knowledge-toc";
 
 export const KnowledgePageView = ({ nodeId }: { nodeId: string }) => {
   const { ref: headerRef, scrolledPast } = useScrolledPast();
@@ -39,5 +40,15 @@ const KnowledgePageContent = ({ nodeId, headerRef }: { nodeId: string; headerRef
 
   const goToParent = () => router.push(node.parentId ? `${section.basePath}/${node.parentId}` : section.basePath);
 
-  return <KnowledgeEditor nodeId={nodeId} onDeleted={goToParent} sentinelRef={headerRef} />;
+  return (
+    <div className="flex items-start gap-8">
+      <KnowledgeToc
+        rootSelector="[data-knowledge-body]"
+        className="sticky top-20 hidden max-h-[calc(100vh-6rem)] w-56 shrink-0 self-start overflow-y-auto py-1 xl:block"
+      />
+      <div className="min-w-0 flex-1">
+        <KnowledgeEditor nodeId={nodeId} onDeleted={goToParent} sentinelRef={headerRef} />
+      </div>
+    </div>
+  );
 };
