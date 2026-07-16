@@ -12,7 +12,6 @@ import { KnowledgeHeaderBar } from "./knowledge-header-bar";
 import { KnowledgeNodeDialog } from "./knowledge-node-dialog";
 import { KnowledgeNodeMenu } from "./knowledge-node-menu";
 import { useKnowledgeSection } from "./knowledge-section-context";
-import { KnowledgeViewToggle } from "./knowledge-view-toggle";
 
 type CreateHandlers = {
   onNewSpace: () => void;
@@ -80,12 +79,5 @@ const KnowledgeSpaceChildren = ({ nodeId, onNewSpace, onNewPage }: { nodeId: str
     );
   }
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex justify-end">
-        <KnowledgeViewToggle />
-      </div>
-      <KnowledgeCollection parentId={nodeId} items={items} />
-    </div>
-  );
+  return <KnowledgeCollection parentId={nodeId} items={items} />;
 };
