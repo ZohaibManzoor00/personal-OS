@@ -296,13 +296,20 @@ export const knowledgeRouter = createTRPCRouter({
         where: { id: input.id, userId },
       });
 
+      const nextTitle = input.title !== undefined && input.title !== node.title ? input.title : undefined;
+      const bodyChanged = input.body !== undefined && input.body !== node.body;
+
+      // Nothing actually changed — skip the write so `updatedAt` isn't bumped
+      // (e.g. opening the editor and confirming without edits).
+      if (nextTitle === undefined && !bodyChanged) return node;
+
       const slug =
-        input.title !== undefined
+        nextTitle !== undefined
           ? await uniqueSlug({
               userId,
               section: node.section,
               parentId: node.parentId,
-              title: input.title,
+              title: nextTitle,
               excludeId: node.id,
             })
           : undefined;
@@ -310,8 +317,8 @@ export const knowledgeRouter = createTRPCRouter({
       return await prisma.node.update({
         where: { id: input.id },
         data: {
-          ...(input.title !== undefined ? { title: input.title, slug } : {}),
-          ...(input.body !== undefined ? { body: input.body } : {}),
+          ...(nextTitle !== undefined ? { title: nextTitle, slug } : {}),
+          ...(bodyChanged ? { body: input.body } : {}),
         },
       });
     }),
