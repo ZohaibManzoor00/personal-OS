@@ -11,14 +11,13 @@ This is my long-term knowledge hub for engineering, career growth, projects, and
 - 📑 **Automatic table of contents** — sticky "On this page" outline generated live from rendered headings, with active-section tracking
 
 ## Tech Stack
-- Next.js
-- React
+- Next.js(React)
 - TypeScript
 - tRPC
 - Prisma
 - PostgreSQL (Neon)
-- Better Auth
-- Cloudflare R2
+- Blob - Cloudflare R2
+- Auth - Better Auth
 - Tailwind CSS
 - shadcn/ui
 
