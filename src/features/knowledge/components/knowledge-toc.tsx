@@ -4,6 +4,9 @@ import type { MouseEvent } from "react";
 import { cn } from "@/lib/utils";
 import { useTableOfContents } from "../hooks/use-table-of-contents";
 
+const FLASH_CLASS = "knowledge-match-flash";
+const FLASH_DURATION = 1800;
+
 /**
  * Sticky "on this page" outline that lists the headings of the current
  * knowledge page and highlights the section in view as the reader scrolls.
@@ -19,7 +22,17 @@ export const KnowledgeToc = ({ rootSelector, className }: { rootSelector: string
 
   const handleClick = (event: MouseEvent<HTMLAnchorElement>, id: string) => {
     event.preventDefault();
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const heading = document.getElementById(id);
+    if (!heading) return;
+    heading.scrollIntoView({ behavior: "smooth", block: "start" });
+
+    // Briefly flash the heading — same cue as landing on a search match —
+    // so the eye catches where it jumped to. Toggling with a reflow restarts
+    // the animation if the same heading is clicked again.
+    heading.classList.remove(FLASH_CLASS);
+    void heading.getBoundingClientRect();
+    heading.classList.add(FLASH_CLASS);
+    window.setTimeout(() => heading.classList.remove(FLASH_CLASS), FLASH_DURATION);
   };
 
   return (
