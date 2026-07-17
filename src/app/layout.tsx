@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Inter, JetBrains_Mono, Outfit } from "next/font/goog
 import { cookies } from "next/headers";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { ActiveThemeProvider } from "@/components/active-theme";
+import { NavHotkeys } from "@/components/nav-hotkeys";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { DEFAULT_THEME, isValidTheme, THEME_COOKIE_NAME } from "@/lib/themes";
@@ -61,6 +62,7 @@ export default async function RootLayout({
               <NuqsAdapter>
                 <TooltipProvider>{children}</TooltipProvider>
               </NuqsAdapter>
+              <NavHotkeys />
               <Toaster />
             </ActiveThemeProvider>
           </ThemeProvider>
