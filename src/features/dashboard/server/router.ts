@@ -4,6 +4,7 @@ import {
   type KnowledgeSection,
   LOCKED_SECTIONS,
 } from "@/features/knowledge/lib/sections";
+import { lockedNodeIds, type ReaderCtx } from "@/features/knowledge/server/locked-nodes";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { createTRPCRouter, publicProcedure } from "@/trpc/init";
@@ -17,14 +18,23 @@ const coverInclude = {
 
 const EMPTY_STATS = { pages: 0, spaces: 0, addedThisWeek: 0, editedThisWeek: 0, words: 0 };
 
-type ReaderCtx = { ownerUserId: string | null; isOwner: boolean };
+/**
+ * Raw-SQL fragment hiding the locked subtree + locked sections from non-owners.
+ * `lockedIds` is the full locked subtree (see `lockedNodeIds`), since locking a
+ * folder doesn't cascade the flag to its children.
+ */
+const lockedSql = (ctx: ReaderCtx, lockedIds: string[]) =>
+  ctx.isOwner
+    ? Prisma.empty
+    : Prisma.sql`AND "section" NOT IN (${Prisma.join([...LOCKED_SECTIONS])})${
+        lockedIds.length ? Prisma.sql` AND "id" NOT IN (${Prisma.join(lockedIds)})` : Prisma.empty
+      }`;
 
-/** Raw-SQL fragment hiding locked nodes/sections from non-owners. */
-const lockedSql = (ctx: ReaderCtx) =>
-  ctx.isOwner ? Prisma.empty : Prisma.sql`AND "locked" = false AND "section" NOT IN (${Prisma.join([...LOCKED_SECTIONS])})`;
-
-/** Prisma `where` fragment hiding locked nodes/sections from non-owners. */
-const lockedWhere = (ctx: ReaderCtx) => (ctx.isOwner ? {} : { locked: false, section: { notIn: [...LOCKED_SECTIONS] } });
+/** Prisma `where` fragment hiding the locked subtree + locked sections from non-owners. */
+const lockedWhere = (ctx: ReaderCtx, lockedIds: string[]) =>
+  ctx.isOwner
+    ? {}
+    : { section: { notIn: [...LOCKED_SECTIONS] }, ...(lockedIds.length ? { id: { notIn: lockedIds } } : {}) };
 
 export const dashboardRouter = createTRPCRouter({
   /**
@@ -35,6 +45,7 @@ export const dashboardRouter = createTRPCRouter({
   stats: publicProcedure.query(async ({ ctx }) => {
     if (!ctx.ownerUserId) return EMPTY_STATS;
 
+    const lockedIds = await lockedNodeIds(ctx);
     const [row] = await prisma.$queryRaw<
       {
         pages: number;
@@ -56,7 +67,7 @@ export const dashboardRouter = createTRPCRouter({
         )::int AS "words"
       FROM "Node"
       WHERE "userId" = ${ctx.ownerUserId} AND "archivedAt" IS NULL
-        ${lockedSql(ctx)}
+        ${lockedSql(ctx, lockedIds)}
     `;
 
     return row ?? EMPTY_STATS;
@@ -65,12 +76,13 @@ export const dashboardRouter = createTRPCRouter({
   /** Most recently viewed nodes across every section — the "jump back in" row. */
   recentAll: publicProcedure.query(async ({ ctx }) => {
     if (!ctx.ownerUserId) return [];
+    const lockedIds = await lockedNodeIds(ctx);
     return await prisma.node.findMany({
       where: {
         userId: ctx.ownerUserId,
         archivedAt: null,
         lastViewedAt: { not: null },
-        ...lockedWhere(ctx),
+        ...lockedWhere(ctx, lockedIds),
       },
       orderBy: { lastViewedAt: "desc" },
       take: RECENT_ALL_LIMIT,
@@ -86,6 +98,7 @@ export const dashboardRouter = createTRPCRouter({
   recentPerSection: publicProcedure.query(async ({ ctx }) => {
     if (!ctx.ownerUserId) return [];
 
+    const lockedIds = await lockedNodeIds(ctx);
     const ranked = await prisma.$queryRaw<
       { id: string; section: string; rn: number }[]
     >`
@@ -99,7 +112,7 @@ export const dashboardRouter = createTRPCRouter({
           )::int AS "rn"
         FROM "Node"
         WHERE "userId" = ${ctx.ownerUserId} AND "archivedAt" IS NULL
-          ${lockedSql(ctx)}
+          ${lockedSql(ctx, lockedIds)}
       ) ranked
       WHERE "rn" <= ${RECENT_PER_SECTION_LIMIT}
     `;

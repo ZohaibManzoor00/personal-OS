@@ -9,6 +9,7 @@ import { createTRPCRouter, ownerProcedure, publicProcedure } from "@/trpc/init";
 import { HIGHLIGHT_END, HIGHLIGHT_START } from "../lib/search-highlight";
 import { isSectionLocked, KNOWLEDGE_SECTIONS, LOCKED_SECTIONS } from "../lib/sections";
 import { slugify } from "../lib/slug";
+import { lockedNodeIds, type ReaderCtx } from "./locked-nodes";
 
 const SEARCH_LIMIT = 20;
 const RECENT_LIMIT = 5;
@@ -84,15 +85,9 @@ const uniqueSlug = async ({
   }
 };
 
-/**
- * Whose content the reads serve, plus whether the viewer is the owner. Reads run
- * as the owner (a read-only public showcase); locked sections and locked nodes
- * are hidden from everyone but the owner.
- */
-type ReaderCtx = { ownerUserId: string | null; isOwner: boolean };
-
-/** Prisma `where` fragment that hides locked nodes from non-owners. */
-const lockedFilter = (ctx: ReaderCtx) => (ctx.isOwner ? {} : { locked: false });
+/** Prisma `where` fragment that hides the locked subtree from non-owners. */
+const excludeLockedFilter = (lockedIds: string[]): Prisma.NodeWhereInput =>
+  lockedIds.length ? { id: { notIn: lockedIds } } : {};
 
 /** A locked section is invisible to non-owners (nothing is ever pulled). */
 const sectionHidden = (ctx: ReaderCtx, section: string) => !ctx.isOwner && isSectionLocked(section);
@@ -120,13 +115,14 @@ export const knowledgeRouter = createTRPCRouter({
     .input(z.object({ section: knowledgeSection, parentId: z.string().nullable() }))
     .query(async ({ ctx, input }) => {
       if (!ctx.ownerUserId || sectionHidden(ctx, input.section)) return [];
+      const lockedIds = await lockedNodeIds(ctx);
       return await prisma.node.findMany({
         where: {
           userId: ctx.ownerUserId,
           section: input.section,
           parentId: input.parentId,
           archivedAt: null,
-          ...lockedFilter(ctx),
+          ...excludeLockedFilter(lockedIds),
         },
         orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
         include: coverInclude,
@@ -155,16 +151,18 @@ export const knowledgeRouter = createTRPCRouter({
 
   listSpaces: publicProcedure.input(z.object({ section: knowledgeSection })).query(async ({ ctx, input }) => {
     if (!ctx.ownerUserId || sectionHidden(ctx, input.section)) return [];
+    const lockedIds = await lockedNodeIds(ctx);
     return await prisma.node.findMany({
-      where: { userId: ctx.ownerUserId, section: input.section, type: "SPACE", archivedAt: null, ...lockedFilter(ctx) },
+      where: { userId: ctx.ownerUserId, section: input.section, type: "SPACE", archivedAt: null, ...excludeLockedFilter(lockedIds) },
       orderBy: { title: "asc" },
     });
   }),
 
   listTree: publicProcedure.input(z.object({ section: knowledgeSection })).query(async ({ ctx, input }) => {
     if (!ctx.ownerUserId || sectionHidden(ctx, input.section)) return [];
+    const lockedIds = await lockedNodeIds(ctx);
     return await prisma.node.findMany({
-      where: { userId: ctx.ownerUserId, section: input.section, archivedAt: null, ...lockedFilter(ctx) },
+      where: { userId: ctx.ownerUserId, section: input.section, archivedAt: null, ...excludeLockedFilter(lockedIds) },
       orderBy: [{ sortOrder: "asc" }, { title: "asc" }],
       select: { id: true, title: true, type: true, parentId: true },
     });
@@ -172,13 +170,14 @@ export const knowledgeRouter = createTRPCRouter({
 
   listRecent: publicProcedure.input(z.object({ section: knowledgeSection })).query(async ({ ctx, input }) => {
     if (!ctx.ownerUserId || sectionHidden(ctx, input.section)) return [];
+    const lockedIds = await lockedNodeIds(ctx);
     return await prisma.node.findMany({
       where: {
         userId: ctx.ownerUserId,
         section: input.section,
         archivedAt: null,
         lastViewedAt: { not: null },
-        ...lockedFilter(ctx),
+        ...excludeLockedFilter(lockedIds),
       },
       orderBy: { lastViewedAt: "desc" },
       take: RECENT_LIMIT,
@@ -409,10 +408,15 @@ export const knowledgeRouter = createTRPCRouter({
   search: publicProcedure.input(z.object({ section: knowledgeSection.optional(), query: z.string() })).query(async ({ ctx, input }) => {
     if (!ctx.ownerUserId) return [];
 
-    // Non-owners can never match locked nodes or nodes in a locked section.
+    // Non-owners can never match a locked node, anything nested inside a locked
+    // node, or a node in a locked section. lockedNodeIds covers the whole locked
+    // subtree (locking a folder doesn't cascade the flag to its children).
+    const lockedIds = await lockedNodeIds(ctx);
     const lockedSql = ctx.isOwner
       ? Prisma.empty
-      : Prisma.sql`AND "locked" = false AND "section" NOT IN (${Prisma.join([...LOCKED_SECTIONS])})`;
+      : Prisma.sql`AND "section" NOT IN (${Prisma.join([...LOCKED_SECTIONS])})${
+          lockedIds.length ? Prisma.sql` AND "id" NOT IN (${Prisma.join(lockedIds)})` : Prisma.empty
+        }`;
 
     // Turn the raw input into a prefix tsquery: strip tsquery operators so user
     // input can't break the syntax, treat each word as a prefix (`:*`) so
