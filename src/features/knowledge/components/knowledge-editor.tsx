@@ -76,14 +76,18 @@ export const KnowledgeEditor = ({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+      if (!(event.metaKey || event.ctrlKey)) return;
+      if (event.key.toLowerCase() === "s") {
         event.preventDefault();
         handleSave();
+      } else if (event.key === "Enter" && isEditing) {
+        event.preventDefault();
+        exitEditRef.current();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleSave]);
+  }, [handleSave, isEditing]);
 
   // Queue images for the crop/preview dialog, remembering where to drop the
   // resulting Markdown once each one is committed.
@@ -135,6 +139,8 @@ export const KnowledgeEditor = ({
     handleSave();
     setIsEditing(false);
   };
+  const exitEditRef = useRef(exitEdit);
+  exitEditRef.current = exitEdit;
 
   usePreviewHotkeys({ enabled: !isEditing && isOwner, onEdit: enterEdit });
 
