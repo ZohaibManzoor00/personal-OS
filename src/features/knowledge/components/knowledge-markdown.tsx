@@ -19,9 +19,18 @@ export const KnowledgeMarkdown = ({ content, className }: { content: string; cla
         // Offset anchor jumps so headings clear the fixed sticky header (h-14).
         "prose-headings:scroll-mt-24 prose-headings:font-heading prose-headings:font-semibold prose-headings:tracking-tight",
         "prose-h2:mt-8 prose-h2:mb-2 prose-h3:mt-6 prose-h3:mb-1.5",
+        // Hairline rule under each H2 marks the start of a section, doc-site style.
+        "prose-h2:border-b prose-h2:border-border prose-h2:pb-2",
         "prose-a:font-medium prose-a:underline-offset-2",
+        // Blockquotes read as accent callouts rather than italic pull-quotes.
+        "prose-blockquote:rounded-r-lg prose-blockquote:border-l-2 prose-blockquote:border-primary prose-blockquote:bg-muted/50 prose-blockquote:px-4 prose-blockquote:py-2 prose-blockquote:font-normal prose-blockquote:not-italic prose-blockquote:text-foreground",
+        "[&_blockquote_p]:before:content-none [&_blockquote_p]:after:content-none",
+        // Accent list markers.
+        "[&_ul>li]:marker:text-primary/60",
         "prose-pre:rounded-xl prose-pre:bg-muted prose-pre:text-foreground prose-pre:ring-1 prose-pre:ring-border",
         "prose-code:before:content-none prose-code:after:content-none",
+        // Inline code (not fenced blocks) gets a subtle pill treatment.
+        "[&_:not(pre)>code]:rounded-md [&_:not(pre)>code]:bg-muted [&_:not(pre)>code]:px-1.5 [&_:not(pre)>code]:py-0.5 [&_:not(pre)>code]:font-normal",
         "prose-img:mx-auto prose-img:my-6 prose-img:max-h-120 prose-img:w-auto prose-img:rounded-2xl prose-img:ring-1 prose-img:ring-border prose-img:shadow-md",
         className,
       )}
