@@ -12,8 +12,13 @@ export const KnowledgeMarkdown = ({ content, className }: { content: string; cla
       data-knowledge-body
       className={cn(
         "prose prose-neutral max-w-none leading-relaxed dark:prose-invert",
+        // Comfortable reading rhythm: room between paragraphs, and headings sit
+        // close to the text they introduce. The first element never adds a top
+        // margin so it hugs the page title above it.
+        "prose-p:my-4 prose-li:my-1 *:first:mt-0",
         // Offset anchor jumps so headings clear the fixed sticky header (h-14).
         "prose-headings:scroll-mt-24 prose-headings:font-heading prose-headings:font-semibold prose-headings:tracking-tight",
+        "prose-h2:mt-8 prose-h2:mb-2 prose-h3:mt-6 prose-h3:mb-1.5",
         "prose-a:font-medium prose-a:underline-offset-2",
         "prose-pre:rounded-xl prose-pre:bg-muted prose-pre:text-foreground prose-pre:ring-1 prose-pre:ring-border",
         "prose-code:before:content-none prose-code:after:content-none",

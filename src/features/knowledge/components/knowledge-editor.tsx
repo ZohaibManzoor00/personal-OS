@@ -147,7 +147,7 @@ export const KnowledgeEditor = ({
   const status = updateNode.isPending ? "Saving…" : isDirty ? "Unsaved changes" : "Saved";
 
   return (
-    <div className="flex h-full flex-col gap-6">
+    <div className="flex h-full flex-col gap-4">
       <div ref={sentinelRef} className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1">
           <h1 className="truncate font-heading text-2xl font-semibold tracking-tight">{node.title}</h1>
