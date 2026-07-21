@@ -12,3 +12,8 @@ export type DashboardRecentNode =
 /** Recent nodes grouped under a single section. */
 export type DashboardSectionGroup =
   RouterOutput["dashboard"]["recentPerSection"][number];
+
+/** Force-directed graph payload: section hubs + nodes, plus parent→child links. */
+export type DashboardGraph = RouterOutput["dashboard"]["graph"];
+export type DashboardGraphNode = DashboardGraph["nodes"][number];
+export type DashboardGraphLink = DashboardGraph["links"][number];

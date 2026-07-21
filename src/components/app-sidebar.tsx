@@ -1,6 +1,16 @@
 "use client";
 
-import { BookIcon, BotIcon, BriefcaseIcon, FolderOpenIcon, HomeIcon, LockIcon, LogInIcon, LogOutIcon } from "lucide-react";
+import {
+  BookIcon,
+  BotIcon,
+  BriefcaseIcon,
+  FolderOpenIcon,
+  HomeIcon,
+  LockIcon,
+  LogInIcon,
+  LogOutIcon,
+  SparklesIcon,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -156,6 +166,16 @@ const menuItems: {
         icon: BotIcon,
         url: "/workflows",
         section: "workflows",
+      },
+    ],
+  },
+  {
+    title: "AI",
+    items: [
+      {
+        title: "AI Chat",
+        icon: SparklesIcon,
+        url: "/chat",
       },
     ],
   },

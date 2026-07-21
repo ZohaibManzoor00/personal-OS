@@ -1,10 +1,14 @@
 import {
   getKnowledgeSectionConfig,
+  isKnowledgeSection,
   KNOWLEDGE_SECTIONS,
   type KnowledgeSection,
   LOCKED_SECTIONS,
 } from "@/features/knowledge/lib/sections";
-import { lockedNodeIds, type ReaderCtx } from "@/features/knowledge/server/locked-nodes";
+import {
+  lockedNodeIds,
+  type ReaderCtx,
+} from "@/features/knowledge/server/locked-nodes";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { createTRPCRouter, publicProcedure } from "@/trpc/init";
@@ -12,11 +16,29 @@ import { createTRPCRouter, publicProcedure } from "@/trpc/init";
 const RECENT_ALL_LIMIT = 3;
 const RECENT_PER_SECTION_LIMIT = 3;
 
+/** A single vertex in the dashboard knowledge graph. */
+type GraphNode = {
+  id: string;
+  title: string;
+  section: KnowledgeSection;
+  /** SECTION = synthetic section hub, otherwise the node's own type. */
+  kind: "SECTION" | "SPACE" | "PAGE";
+};
+
+/** A parent→child (or hub→node) edge in the dashboard knowledge graph. */
+type GraphLink = { source: string; target: string };
+
 const coverInclude = {
   images: { orderBy: { createdAt: "desc" }, take: 1 },
 } as const;
 
-const EMPTY_STATS = { pages: 0, spaces: 0, addedThisWeek: 0, editedThisWeek: 0, words: 0 };
+const EMPTY_STATS = {
+  pages: 0,
+  spaces: 0,
+  addedThisWeek: 0,
+  editedThisWeek: 0,
+  words: 0,
+};
 
 /**
  * Raw-SQL fragment hiding the locked subtree + locked sections from non-owners.
@@ -27,14 +49,19 @@ const lockedSql = (ctx: ReaderCtx, lockedIds: string[]) =>
   ctx.isOwner
     ? Prisma.empty
     : Prisma.sql`AND "section" NOT IN (${Prisma.join([...LOCKED_SECTIONS])})${
-        lockedIds.length ? Prisma.sql` AND "id" NOT IN (${Prisma.join(lockedIds)})` : Prisma.empty
+        lockedIds.length
+          ? Prisma.sql` AND "id" NOT IN (${Prisma.join(lockedIds)})`
+          : Prisma.empty
       }`;
 
 /** Prisma `where` fragment hiding the locked subtree + locked sections from non-owners. */
 const lockedWhere = (ctx: ReaderCtx, lockedIds: string[]) =>
   ctx.isOwner
     ? {}
-    : { section: { notIn: [...LOCKED_SECTIONS] }, ...(lockedIds.length ? { id: { notIn: lockedIds } } : {}) };
+    : {
+        section: { notIn: [...LOCKED_SECTIONS] },
+        ...(lockedIds.length ? { id: { notIn: lockedIds } } : {}),
+      };
 
 export const dashboardRouter = createTRPCRouter({
   /**
@@ -154,5 +181,72 @@ export const dashboardRouter = createTRPCRouter({
         nodes: sectionNodes,
       };
     }).filter((group) => group.nodes.length > 0);
+  }),
+
+  /**
+   * The whole knowledge tree flattened into a force-directed graph: every node
+   * plus one synthetic hub per section that has content. Edges follow the
+   * parent→child hierarchy; any node whose parent is hidden (locked subtree for
+   * non-owners) or top-level attaches to its section hub instead, so the graph
+   * never has dangling links and always resolves into per-section clusters.
+   */
+  graph: publicProcedure.query(async ({ ctx }) => {
+    if (!ctx.ownerUserId) return { nodes: [], links: [] };
+
+    const lockedIds = await lockedNodeIds(ctx);
+    const rows = await prisma.node.findMany({
+      where: {
+        userId: ctx.ownerUserId,
+        archivedAt: null,
+        ...lockedWhere(ctx, lockedIds),
+      },
+      select: {
+        id: true,
+        title: true,
+        section: true,
+        type: true,
+        parentId: true,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const visibleIds = new Set(rows.map((row) => row.id));
+    const sectionsPresent = new Set<KnowledgeSection>();
+
+    const nodes: GraphNode[] = [];
+    const links: GraphLink[] = [];
+
+    for (const row of rows) {
+      const section = (
+        isKnowledgeSection(row.section) ? row.section : "learnings"
+      ) as KnowledgeSection;
+      sectionsPresent.add(section);
+
+      nodes.push({
+        id: row.id,
+        title: row.title,
+        section,
+        kind: row.type,
+      });
+
+      const parentVisible =
+        row.parentId != null && visibleIds.has(row.parentId);
+      links.push({
+        source: parentVisible ? (row.parentId as string) : `section:${section}`,
+        target: row.id,
+      });
+    }
+
+    // Prepend a hub per populated section so each cluster has a labelled anchor.
+    const hubs: GraphNode[] = KNOWLEDGE_SECTIONS.filter((section) =>
+      sectionsPresent.has(section),
+    ).map((section) => ({
+      id: `section:${section}`,
+      title: getKnowledgeSectionConfig(section).label,
+      section,
+      kind: "SECTION" as const,
+    }));
+
+    return { nodes: [...hubs, ...nodes], links };
   }),
 });

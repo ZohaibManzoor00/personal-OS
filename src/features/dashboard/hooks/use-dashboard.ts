@@ -15,3 +15,8 @@ export const useDashboardRecentPerSection = () => {
   const trpc = useTRPC();
   return useSuspenseQuery(trpc.dashboard.recentPerSection.queryOptions());
 };
+
+export const useDashboardGraph = () => {
+  const trpc = useTRPC();
+  return useSuspenseQuery(trpc.dashboard.graph.queryOptions());
+};
