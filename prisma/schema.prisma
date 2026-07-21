@@ -105,12 +105,21 @@ model Node {
   children Node[]  @relation("NodeTree")
 
   images NodeImage[]
+  chunks NodeChunk[]
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   archivedAt   DateTime?
   lastViewedAt DateTime?
+
+  /// AI embeddings bookkeeping. `embeddedAt` is when this node's body was last
+  /// turned into vector chunks; `embeddedHash` is a hash of the exact content
+  /// that was embedded. A node is "stale" (needs re-embedding) when it has never
+  /// been embedded or its content hash no longer matches. The syncEmbeddings job
+  /// uses these to only (re)embed what actually changed. See src/inngest.
+  embeddedAt   DateTime?
+  embeddedHash String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -150,6 +159,39 @@ model NodeImage {
   createdAt DateTime @default(now())
 
   @@index([nodeId])
+}
+
+/// One embedded slice of a Node's body. A node's content is split into chunks
+/// and each chunk gets its own vector, so semantic search can match the most
+/// relevant passage instead of a whole document. These rows are fully rebuilt
+/// by the syncEmbeddings job whenever a node's content changes.
+model NodeChunk {
+  id String @id @default(cuid())
+
+  nodeId String
+  node   Node   @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  /// Denormalized from Node so vector search can filter by owner + section
+  /// (and reuse the same locked-section rules as full-text search) without a join.
+  userId  String
+  section String
+
+  /// 0-based position of this chunk within the node's body.
+  chunkIndex Int
+
+  /// The plain-text passage that was embedded (kept so results can show a snippet).
+  content String @db.Text
+
+  /// pgvector embedding — OpenAI text-embedding-3-small (1536 dims). Declared as
+  /// Unsupported + dbgenerated so Prisma leaves it alone: the `vector` column and
+  /// its HNSW index are created via prisma/sql (see node_chunk_embedding.sql) and
+  /// read/written with raw SQL, exactly like Node.searchVector.
+  embedding Unsupported("vector(1536)")? @default(dbgenerated())
+
+  createdAt DateTime @default(now())
+
+  @@unique([nodeId, chunkIndex])
+  @@index([userId, section])
 }
 
 enum NodeType {

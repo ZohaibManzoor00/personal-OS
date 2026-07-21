@@ -1,20 +1,30 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { ArrowUpIcon, SparklesIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { ArrowDownIcon, ArrowUpIcon, SparklesIcon } from "lucide-react";
+import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useIsOwner } from "@/features/auth/hooks/use-is-owner";
+import { getSectionIcon } from "@/features/dashboard/lib/section-meta";
 import { KnowledgeMarkdown } from "@/features/knowledge/components/knowledge-markdown";
+import { buildNodeHref } from "@/features/knowledge/lib/search-navigation";
 import { cn } from "@/lib/utils";
 import { useTRPC } from "@/trpc/client";
+
+type ChatSource = {
+  id: string;
+  title: string;
+  section: string;
+};
 
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
+  sources?: ChatSource[];
 };
 
 const SUGGESTIONS = [
@@ -28,6 +38,7 @@ export const ChatPanel = () => {
   const { isOwner } = useIsOwner();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  const [atBottom, setAtBottom] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const sendMutation = useMutation(
@@ -36,13 +47,24 @@ export const ChatPanel = () => {
     }),
   );
 
-  // Keep the newest message (and the typing indicator) in view.
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior });
+  }, []);
+
+  // Follow the conversation as it grows, but don't yank the user back down if
+  // they've scrolled up to read earlier messages.
   useEffect(() => {
-    scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: "smooth",
-    });
-  }, [messages, sendMutation.isPending]);
+    if (atBottom) scrollToBottom();
+  }, [messages, sendMutation.isPending, atBottom, scrollToBottom]);
+
+  const onScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    setAtBottom(distanceFromBottom < 80);
+  };
 
   const send = async (raw: string) => {
     const content = raw.trim();
@@ -54,14 +76,16 @@ export const ChatPanel = () => {
     ];
     setMessages(next);
     setInput("");
+    // Sending is an explicit intent to be at the latest message.
+    setAtBottom(true);
 
     try {
-      const { text } = await sendMutation.mutateAsync({
+      const { text, sources } = await sendMutation.mutateAsync({
         messages: next.map(({ role, content }) => ({ role, content })),
       });
       setMessages((current) => [
         ...current,
-        { id: crypto.randomUUID(), role: "assistant", content: text },
+        { id: crypto.randomUUID(), role: "assistant", content: text, sources },
       ]);
     } catch {
       // Surfaced via the mutation's onError toast.
@@ -78,8 +102,15 @@ export const ChatPanel = () => {
   const empty = messages.length === 0;
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+    <div className="relative flex h-full min-h-0 flex-col">
+      {/* Soft blur so messages dissolve into the top edge as they scroll away. */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-8 backdrop-blur-sm mask-[linear-gradient(to_bottom,black,transparent)]" />
+
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+      >
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-1 py-4">
           {empty ? (
             <div className="flex flex-col items-center gap-6 py-16 text-center">
@@ -118,7 +149,22 @@ export const ChatPanel = () => {
         </div>
       </div>
 
-      <div className="shrink-0 pt-3">
+      <div className="relative shrink-0 pt-3">
+        {!empty && !atBottom && (
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            onClick={() => {
+              setAtBottom(true);
+              scrollToBottom();
+            }}
+            className="absolute -top-11 left-1/2 z-10 size-9 -translate-x-1/2 rounded-full bg-card shadow-md"
+            aria-label="Scroll to latest"
+          >
+            <ArrowDownIcon className="size-4" />
+          </Button>
+        )}
         <div className="mx-auto w-full max-w-3xl">
           <div className="relative flex items-end gap-2 rounded-2xl border border-input bg-card p-2 shadow-xs focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
             <Textarea
@@ -173,12 +219,38 @@ const ChatBubble = ({ message }: { message: ChatMessage }) => {
         {isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
         ) : (
-          <KnowledgeMarkdown content={message.content} className="prose-sm" />
+          <>
+            <KnowledgeMarkdown content={message.content} className="prose-sm" />
+            {message.sources && message.sources.length > 0 && (
+              <ChatSources sources={message.sources} />
+            )}
+          </>
         )}
       </div>
     </div>
   );
 };
+
+const ChatSources = ({ sources }: { sources: ChatSource[] }) => (
+  <div className="mt-3 flex flex-wrap gap-1.5 border-t border-border/60 pt-2.5">
+    <span className="w-full text-[11px] font-medium text-muted-foreground">
+      Sources
+    </span>
+    {sources.map((source) => {
+      const Icon = getSectionIcon(source.section);
+      return (
+        <Link
+          key={source.id}
+          href={buildNodeHref(source.section, source.id)}
+          className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <Icon className="size-3 shrink-0" />
+          <span className="truncate">{source.title}</span>
+        </Link>
+      );
+    })}
+  </div>
+);
 
 const TypingIndicator = () => (
   <div className="flex gap-3">

@@ -14,7 +14,9 @@ export const AiChatWorkspace = () => {
   const [view, setView] = useState<View>("chat");
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4">
+    // Pin the workspace to the viewport (minus the app header + container
+    // padding) so the page itself never scrolls; only the message list does.
+    <div className="flex h-[calc(100svh-5.5rem)] min-h-0 flex-col gap-4 md:h-[calc(100svh-6.5rem)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col">
           <h1 className="font-heading text-xl font-semibold">AI Chat</h1>
