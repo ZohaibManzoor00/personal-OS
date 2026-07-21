@@ -36,8 +36,7 @@ export const KnowledgeToc = ({ rootSelector, className }: { rootSelector: string
   };
 
   return (
-    <nav aria-label="On this page" className={cn("text-sm", className)}>
-      <p className="mb-3 pl-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">On this page</p>
+    <nav aria-label="On this page" className={cn("text-[0.95rem]", className)}>
       <ul className="flex flex-col border-l border-border">
         {items.map((item) => {
           const active = item.id === activeId;
@@ -48,7 +47,7 @@ export const KnowledgeToc = ({ rootSelector, className }: { rootSelector: string
                 onClick={(event) => handleClick(event, item.id)}
                 style={{ paddingLeft: `${(item.level - minLevel) * 12 + 16}px` }}
                 className={cn(
-                  "-ml-px block border-l py-1 pr-2 leading-snug transition-colors",
+                  "-ml-px block border-l py-1.5 pr-2 leading-snug transition-colors",
                   active
                     ? "border-primary font-medium text-foreground"
                     : "border-transparent text-muted-foreground hover:border-border hover:text-foreground",

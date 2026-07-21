@@ -46,7 +46,7 @@ const KnowledgePageContent = ({ nodeId, headerRef }: { nodeId: string; headerRef
     <div className="flex items-start gap-8">
       <KnowledgeToc
         rootSelector="[data-knowledge-body]"
-        className="sticky top-20 hidden max-h-[calc(100vh-6rem)] w-56 shrink-0 self-start overflow-y-auto py-1 xl:block"
+        className="sticky top-20 hidden max-h-[calc(100vh-6rem)] w-64 shrink-0 self-start overflow-y-auto py-1 xl:block"
       />
       <div className="min-w-0 flex-1 rounded-xl border bg-card p-6 shadow-sm sm:p-8 lg:p-10">
         <KnowledgeEditor nodeId={nodeId} onDeleted={goToParent} sentinelRef={headerRef} />
