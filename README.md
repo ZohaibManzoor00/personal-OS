@@ -1,5 +1,5 @@
-# Personal OS
-A personal operating system built to capture, organize, and grow everything I learn.
+# My Personal OS
+An operating system built to capture, organize, and grow everything I learn.
 
 ## Overview
 This is my long-term knowledge hub for engineering, career growth, projects, and AI-powered workflows. Instead of scattered Google Docs and notes, everything lives in one connected system designed around how I learn and work.
