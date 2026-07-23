@@ -152,7 +152,7 @@ export const ChatPanel = () => {
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-8 backdrop-blur-sm mask-[linear-gradient(to_bottom,black,transparent)]" />
 
       <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-1 py-4">
+        <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-2 py-6 sm:px-4">
           {empty ? (
             <div className="flex flex-col items-center gap-6 py-16 text-center">
               <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20">
@@ -208,7 +208,7 @@ export const ChatPanel = () => {
             <ArrowDownIcon className="size-4" />
           </Button>
         )}
-        <div className="mx-auto w-full max-w-3xl">
+        <div className="mx-auto w-full max-w-4xl px-2 sm:px-4">
           <div className="relative flex items-end gap-2 rounded-2xl border border-input bg-card p-2 shadow-xs focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
             <Textarea
               value={input}
@@ -261,12 +261,14 @@ const ChatBubble = ({
         </span>
       )}
       {/* Column so the follow-up bubbles can sit beneath the answer, aligned
-          under it rather than beside the avatar. */}
-      <div className="flex min-w-0 max-w-[85%] flex-col gap-2">
+          under it rather than beside the avatar. Assistant answers are markdown
+          and use the full width; user messages stay a compact right-aligned
+          bubble. */}
+      <div className={cn("flex min-w-0 flex-col gap-2", isUser ? "max-w-[80%]" : "min-w-0 flex-1")}>
         <div
           className={cn(
-            "min-w-0 rounded-2xl px-4 py-2.5 text-sm",
-            isUser ? "bg-primary text-primary-foreground" : "bg-card ring-1 ring-border",
+            "min-w-0 rounded-2xl text-sm",
+            isUser ? "bg-primary px-4 py-2.5 text-primary-foreground" : "bg-card px-5 py-4 ring-1 ring-border",
           )}
         >
           {isUser ? (
