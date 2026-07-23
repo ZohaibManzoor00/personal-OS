@@ -36,11 +36,15 @@ Be concise, direct, and genuinely helpful. Use GitHub-flavored Markdown for stru
 
 /**
  * Wraps the retrieved note chunks into a context block for the system prompt.
- * Each source is numbered and labeled with its note title + section so the model
- * can cite it by name.
+ * Each chunk is labeled with the bracketed number of its *source note* (not the
+ * chunk position) so the citation markers the model writes line up with the
+ * distinct `sources` list the UI renders — one note that contributes several
+ * chunks always carries the same number.
  */
-const buildContextBlock = (chunks: Awaited<ReturnType<typeof searchChunks>>) =>
-  chunks.map((chunk, index) => `[${index + 1}] ${chunk.title} · ${chunk.section}\n${chunk.content}`).join("\n\n");
+const buildContextBlock = (chunks: Awaited<ReturnType<typeof searchChunks>>, sourceNumberByNodeId: Map<string, number>) =>
+  chunks
+    .map((chunk) => `[${sourceNumberByNodeId.get(chunk.nodeId)}] ${chunk.title} · ${chunk.section}\n${chunk.content}`)
+    .join("\n\n");
 
 const messageSchema = z.object({
   role: z.enum(["user", "assistant"]),
@@ -127,22 +131,25 @@ export const chatRouter = createTRPCRouter({
       // candidate; once reranking lands this becomes a filtered subset.
       const chunks = candidates;
 
-      const context = buildContextBlock(chunks);
+      // Distinct source notes (a note can contribute several chunks), preserving
+      // the relevance order from the search. Their 1-based position is the
+      // citation number the model uses and the UI renders, so it must be derived
+      // before we build the prompt.
+      const sources = [
+        ...new Map(chunks.map((chunk) => [chunk.nodeId, { id: chunk.nodeId, title: chunk.title, section: chunk.section }])).values(),
+      ];
+      const sourceNumberByNodeId = new Map(sources.map((source, index) => [source.id, index + 1]));
+
+      const context = buildContextBlock(chunks, sourceNumberByNodeId);
       const system = context
         ? `${CHAT_SYSTEM_PROMPT}
 
-Use the notes below — the user's own knowledge base — to answer when they're relevant, and cite them by title. If they don't cover the question, say so and answer from general knowledge.
+Use the notes below — the user's own knowledge base — to answer when they're relevant. Each note is prefixed with a bracketed number. When a sentence draws on a note, cite it inline with that number in brackets (e.g. "React batches updates [1]."). Cite only the numbers shown below, place the marker right after the claim it supports, and combine multiple sources as [1][2]. If the notes don't cover the question, say so and answer from general knowledge without citing.
 
 --- NOTES ---
 ${context}
 --- END NOTES ---`
         : CHAT_SYSTEM_PROMPT;
-
-      // Distinct source notes (a note can contribute several chunks), preserving
-      // the relevance order from the search.
-      const sources = [
-        ...new Map(chunks.map((chunk) => [chunk.nodeId, { id: chunk.nodeId, title: chunk.title, section: chunk.section }])).values(),
-      ];
 
       // Emit sources first so the UI can render citations before the answer lands.
       yield { type: "sources" as const, sources };

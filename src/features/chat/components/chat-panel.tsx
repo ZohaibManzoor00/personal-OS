@@ -1,6 +1,16 @@
 "use client";
 
-import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, GaugeIcon, SparklesIcon, TriangleAlertIcon } from "lucide-react";
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  ChevronDownIcon,
+  GaugeIcon,
+  PencilIcon,
+  RefreshCwIcon,
+  SparklesIcon,
+  SquareIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -8,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useIsOwner } from "@/features/auth/hooks/use-is-owner";
 import { getSectionIcon } from "@/features/dashboard/lib/section-meta";
+import type { CitationMap } from "@/features/knowledge/components/knowledge-markdown";
 import { KnowledgeMarkdown } from "@/features/knowledge/components/knowledge-markdown";
 import { buildNodeHref } from "@/features/knowledge/lib/search-navigation";
 import { cn } from "@/lib/utils";
@@ -66,6 +77,9 @@ export const ChatPanel = () => {
   const [atBottom, setAtBottom] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Lets the user cut a streaming answer short. Held in a ref so the Stop button
+  // can reach the in-flight request without re-rendering on every token.
+  const abortRef = useRef<AbortController | null>(null);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     const el = scrollRef.current;
@@ -87,28 +101,32 @@ export const ChatPanel = () => {
     setAtBottom(distanceFromBottom < 80);
   };
 
-  const send = async (raw: string) => {
-    const content = raw.trim();
-    if (!content || isStreaming) return;
+  // Runs one assistant turn against a fixed history whose last entry is the user
+  // message being answered. Shared by fresh sends, regenerate, and edit-resend —
+  // each just hands over a different history and lets this own the streaming,
+  // cancellation, and error handling.
+  const runTurn = async (history: ChatMessage[]) => {
+    if (isStreaming) return;
 
-    const history: ChatMessage[] = [...messages, { id: crypto.randomUUID(), role: "user", content }];
     // An empty assistant bubble we fill in as tokens stream. Tracking its id
     // lets us patch just this message on each event without touching the rest.
     const assistantId = crypto.randomUUID();
-
     setMessages([...history, { id: assistantId, role: "assistant", content: "" }]);
-    setInput("");
-    // Sending is an explicit intent to be at the latest message.
+    // Starting a turn is an explicit intent to be at the latest message.
     setAtBottom(true);
     setIsStreaming(true);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     const patchAssistant = (patch: (message: ChatMessage) => ChatMessage) =>
       setMessages((current) => current.map((message) => (message.id === assistantId ? patch(message) : message)));
 
     try {
-      const stream = await getStreamingTRPCClient().chat.send.mutate({
-        messages: history.map(({ role, content }) => ({ role, content })),
-      });
+      const stream = await getStreamingTRPCClient().chat.send.mutate(
+        { messages: history.map(({ role, content }) => ({ role, content })) },
+        { signal: controller.signal },
+      );
 
       for await (const event of stream) {
         if (event.type === "sources") {
@@ -129,18 +147,52 @@ export const ChatPanel = () => {
       }
     } catch (error) {
       // Drop the assistant bubble if nothing streamed in; keep any partial text
-      // so the user still sees what arrived before the failure.
+      // so the user still sees what arrived before the failure (or before they
+      // hit Stop). A user-initiated abort isn't an error worth toasting.
       setMessages((current) => current.filter((message) => message.id !== assistantId || message.content.length > 0));
-      toast.error(error instanceof Error ? error.message : "Could not reach the assistant. Please try again.");
+      if (!controller.signal.aborted) {
+        toast.error(error instanceof Error ? error.message : "Could not reach the assistant. Please try again.");
+      }
     } finally {
       setIsStreaming(false);
+      abortRef.current = null;
     }
+  };
+
+  const send = (raw: string) => {
+    const content = raw.trim();
+    if (!content || isStreaming) return;
+    setInput("");
+    void runTurn([...messages, { id: crypto.randomUUID(), role: "user", content }]);
+  };
+
+  // Interrupt the in-flight answer; runTurn's abort branch keeps whatever text
+  // already streamed in.
+  const stop = () => abortRef.current?.abort();
+
+  // Re-answer the most recent user message: drop the current assistant reply (and
+  // its follow-ups) and stream a fresh one from the same history.
+  const regenerate = () => {
+    if (isStreaming) return;
+    const lastUserIndex = messages.findLastIndex((message) => message.role === "user");
+    if (lastUserIndex === -1) return;
+    void runTurn(messages.slice(0, lastUserIndex + 1));
+  };
+
+  // Replace an earlier user message with edited text and re-answer from there,
+  // discarding everything that followed it (that thread no longer applies).
+  const editAndResend = (id: string, raw: string) => {
+    const content = raw.trim();
+    if (!content || isStreaming) return;
+    const index = messages.findIndex((message) => message.id === id);
+    if (index === -1) return;
+    void runTurn([...messages.slice(0, index), { ...messages[index], content }]);
   };
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
-      void send(input);
+      send(input);
     }
   };
 
@@ -185,7 +237,12 @@ export const ChatPanel = () => {
                 // from earlier answers don't linger mid-conversation.
                 showFollowups={index === messages.length - 1 && !isStreaming}
                 canSend={isOwner && !isStreaming}
-                onSelectFollowup={(followup) => void send(followup)}
+                onSelectFollowup={(followup) => send(followup)}
+                // Regenerate hangs off the final assistant answer only.
+                showRegenerate={message.role === "assistant" && index === messages.length - 1 && !isStreaming}
+                onRegenerate={regenerate}
+                canEdit={isOwner && !isStreaming}
+                onEditSubmit={(content) => editAndResend(message.id, content)}
               />
             ))
           )}
@@ -219,16 +276,22 @@ export const ChatPanel = () => {
               placeholder={isOwner ? "Message Jarvis…" : "Chat is available to the owner"}
               className="max-h-40 min-h-0 flex-1 resize-none border-0 bg-transparent px-2 py-1.5 shadow-none focus-visible:border-0 focus-visible:ring-0"
             />
-            <Button
-              type="button"
-              size="icon"
-              disabled={!isOwner || !input.trim() || isStreaming}
-              onClick={() => void send(input)}
-              className="size-8 rounded-lg"
-              aria-label="Send message"
-            >
-              <ArrowUpIcon className="size-4" />
-            </Button>
+            {isStreaming ? (
+              <Button type="button" size="icon" onClick={stop} className="size-8 rounded-lg" aria-label="Stop generating">
+                <SquareIcon className="size-3.5 fill-current" />
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                size="icon"
+                disabled={!isOwner || !input.trim()}
+                onClick={() => send(input)}
+                className="size-8 rounded-lg"
+                aria-label="Send message"
+              >
+                <ArrowUpIcon className="size-4" />
+              </Button>
+            )}
           </div>
           <p className="mt-2 text-center text-[11px] text-muted-foreground">
             Jarvis can make mistakes. Enter to send, Shift+Enter for a new line.
@@ -239,22 +302,83 @@ export const ChatPanel = () => {
   );
 };
 
+// Maps the assistant's distinct sources onto the citation numbers the model
+// emits (`[1]`, `[2]`, …) so KnowledgeMarkdown can turn those markers into
+// links. The order here mirrors the server's `sources` numbering.
+const buildCitations = (sources: ChatSource[]): CitationMap =>
+  Object.fromEntries(sources.map((source, index) => [index + 1, { href: buildNodeHref(source.section, source.id), title: source.title }]));
+
 const ChatBubble = ({
   message,
   showFollowups,
   canSend,
   onSelectFollowup,
+  showRegenerate,
+  onRegenerate,
+  canEdit,
+  onEditSubmit,
 }: {
   message: ChatMessage;
   showFollowups: boolean;
   canSend: boolean;
   onSelectFollowup: (followup: string) => void;
+  showRegenerate: boolean;
+  onRegenerate: () => void;
+  canEdit: boolean;
+  onEditSubmit: (content: string) => void;
 }) => {
   const isUser = message.role === "user";
   const followups = !isUser && showFollowups ? (message.followups ?? []) : [];
+  const citations = message.sources && message.sources.length > 0 ? buildCitations(message.sources) : undefined;
+
+  // Local edit state for user messages: entering edit mode swaps the bubble for
+  // a textarea seeded with the current text.
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState(message.content);
+
+  const beginEdit = () => {
+    setDraft(message.content);
+    setIsEditing(true);
+  };
+  const submitEdit = () => {
+    onEditSubmit(draft);
+    setIsEditing(false);
+  };
+
+  if (isUser && isEditing) {
+    return (
+      <div className="flex flex-row-reverse gap-3">
+        <div className="flex w-full max-w-[80%] flex-col gap-2">
+          <Textarea
+            value={draft}
+            autoFocus
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                submitEdit();
+              } else if (event.key === "Escape") {
+                setIsEditing(false);
+              }
+            }}
+            rows={2}
+            className="resize-none rounded-2xl bg-card"
+          />
+          <div className="flex justify-end gap-2">
+            <Button type="button" size="sm" variant="ghost" onClick={() => setIsEditing(false)}>
+              Cancel
+            </Button>
+            <Button type="button" size="sm" disabled={!draft.trim()} onClick={submitEdit}>
+              Send
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={cn("flex gap-3", isUser && "flex-row-reverse")}>
+    <div className={cn("group/message flex gap-3", isUser && "flex-row-reverse")}>
       {!isUser && (
         <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/20">
           <SparklesIcon className="size-4" />
@@ -264,7 +388,7 @@ const ChatBubble = ({
           under it rather than beside the avatar. Assistant answers are markdown
           and use the full width; user messages stay a compact right-aligned
           bubble. */}
-      <div className={cn("flex min-w-0 flex-col gap-2", isUser ? "max-w-[80%]" : "min-w-0 flex-1")}>
+      <div className={cn("flex min-w-0 flex-col gap-2", isUser ? "max-w-[80%] items-end" : "min-w-0 flex-1")}>
         <div
           className={cn(
             "min-w-0 rounded-2xl text-sm",
@@ -279,12 +403,35 @@ const ChatBubble = ({
             <TypingDots />
           ) : (
             <>
-              <KnowledgeMarkdown content={message.content} className="prose-sm" />
+              <KnowledgeMarkdown content={message.content} className="prose-sm" citations={citations} />
               {message.sources && message.sources.length > 0 && <ChatSources sources={message.sources} />}
               {message.trace && <ChatTraceDetails trace={message.trace} />}
             </>
           )}
         </div>
+
+        {/* Per-message actions. Edit is revealed on hover for user messages;
+            regenerate sits under the latest answer. */}
+        {isUser && canEdit && (
+          <button
+            type="button"
+            onClick={beginEdit}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/message:opacity-100"
+          >
+            <PencilIcon className="size-3" />
+            Edit
+          </button>
+        )}
+        {showRegenerate && (
+          <button
+            type="button"
+            onClick={onRegenerate}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <RefreshCwIcon className="size-3" />
+            Regenerate
+          </button>
+        )}
 
         {followups.length > 0 && (
           <div className="flex flex-wrap gap-2">
@@ -421,14 +568,18 @@ const ChatTraceDetails = ({ trace }: { trace: ChatTrace }) => {
 const ChatSources = ({ sources }: { sources: ChatSource[] }) => (
   <div className="mt-3 flex flex-wrap gap-1.5 border-t border-border/60 pt-2.5">
     <span className="w-full text-[11px] font-medium text-muted-foreground">Sources</span>
-    {sources.map((source) => {
+    {sources.map((source, index) => {
       const Icon = getSectionIcon(source.section);
       return (
         <Link
           key={source.id}
           href={buildNodeHref(source.section, source.id)}
-          className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-background py-1 pr-2.5 pl-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
+          {/* The number ties each source back to its inline [n] citation. */}
+          <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+            {index + 1}
+          </span>
           <Icon className="size-3 shrink-0" />
           <span className="truncate">{source.title}</span>
         </Link>

@@ -1,12 +1,34 @@
 "use client";
 
+import type { Options } from "react-markdown";
 import Markdown from "react-markdown";
 import rehypeSlug from "rehype-slug";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
+import { CITATION_HREF_PREFIX, remarkCitations } from "@/features/knowledge/lib/remark-citations";
 import { cn } from "@/lib/utils";
 
-export const KnowledgeMarkdown = ({ content, className }: { content: string; className?: string }) => {
+/**
+ * Inline citation targets, keyed by the 1-based number the model cites (`[1]`,
+ * `[2]`, …). When provided, `[n]` markers in the content become clickable source
+ * chips. Notes rendering (no citations) simply omits this and any `[n]` stays
+ * literal text.
+ */
+export type CitationMap = Record<number, { href: string; title: string }>;
+
+export const KnowledgeMarkdown = ({
+  content,
+  className,
+  citations,
+}: {
+  content: string;
+  className?: string;
+  citations?: CitationMap;
+}) => {
+  const citationNumbers = citations ? Object.keys(citations).map(Number) : [];
+  const remarkPlugins: NonNullable<Options["remarkPlugins"]> = [remarkGfm, remarkBreaks];
+  if (citationNumbers.length > 0) remarkPlugins.push([remarkCitations, new Set(citationNumbers)]);
+
   return (
     <div
       data-knowledge-body
@@ -36,10 +58,28 @@ export const KnowledgeMarkdown = ({ content, className }: { content: string; cla
       )}
     >
       <Markdown
-        remarkPlugins={[remarkGfm, remarkBreaks]}
+        remarkPlugins={remarkPlugins}
         rehypePlugins={[rehypeSlug]}
         components={{
-          a: ({ node, ...props }) => <a target="_blank" rel="noopener noreferrer" {...props} />,
+          a: ({ node, href, children, ...props }) => {
+            // A citation chip: swap the sentinel hash for the real note href and
+            // render a compact superscript number instead of link text.
+            if (citations && href?.startsWith(CITATION_HREF_PREFIX)) {
+              const number = Number(href.slice(CITATION_HREF_PREFIX.length));
+              const target = citations[number];
+              if (!target) return <>[{number}]</>;
+              return (
+                <a
+                  href={target.href}
+                  title={target.title}
+                  className="ml-0.5 inline-flex items-center rounded bg-primary/10 px-1 align-super text-[0.65em] font-semibold text-primary no-underline transition-colors hover:bg-primary/20"
+                >
+                  {number}
+                </a>
+              );
+            }
+            return <a target="_blank" rel="noopener noreferrer" href={href} {...props}>{children}</a>;
+          },
           // biome-ignore lint/performance/noImgElement: R2 public asset, no next/image domain config
           img: ({ node, ...props }) => <img loading="lazy" alt="" {...props} />,
         }}
