@@ -1,8 +1,11 @@
 import { openai } from "@ai-sdk/openai";
+import { propagateAttributes, startActiveObservation, updateActiveObservation } from "@langfuse/tracing";
 import { TRPCError } from "@trpc/server";
 import { generateObject } from "ai";
+import { after } from "next/server";
 import z from "zod";
 import { Prisma } from "@/generated/prisma/client";
+import { langfuseSpanProcessor } from "@/instrumentation.node";
 import { prisma } from "@/lib/db";
 import { deleteObject, getPresignedUploadUrl, getPublicUrl } from "@/lib/r2";
 import { createTRPCRouter, ownerProcedure, publicProcedure } from "@/trpc/init";
@@ -649,29 +652,42 @@ export const knowledgeRouter = createTRPCRouter({
     return { nodeId: input.nodeId };
   }),
 
-  polishMarkdown: ownerProcedure.input(z.object({ text: z.string().min(1).max(FORMAT_MAX_CHARS) })).mutation(async ({ input }) => {
-    try {
-      // generateObject forces a schema-shaped response, so we always get back
-      // the formatted document in a known field — no stray commentary or
-      // wrapping fences to strip.
-      const { object } = await generateObject({
-        model: openai(FORMAT_MODEL),
-        schema: z.object({
-          markdown: z.string().describe("The reformatted GitHub-Flavored Markdown document."),
-        }),
-        system: FORMAT_SYSTEM_PROMPT,
-        prompt: input.text,
-        temperature: 0.2,
-        maxOutputTokens: 8192,
-      });
+  polishMarkdown: ownerProcedure.input(z.object({ text: z.string().min(1).max(FORMAT_MAX_CHARS) })).mutation(async ({ ctx, input }) => {
+    // Flush the trace once the response is on its way (serverless-safe).
+    after(() => langfuseSpanProcessor.forceFlush());
 
-      return { markdown: object.markdown };
-    } catch (error) {
-      console.error("polishMarkdown failed", error);
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Could not format the note. Please try again.",
-      });
-    }
+    return startActiveObservation(
+      "polish-markdown",
+      () =>
+        propagateAttributes({ userId: ctx.auth.user.id, tags: ["format-note"] }, async () => {
+          updateActiveObservation({ input: input.text });
+          try {
+            // generateObject forces a schema-shaped response, so we always get back
+            // the formatted document in a known field — no stray commentary or
+            // wrapping fences to strip.
+            const { object } = await generateObject({
+              model: openai(FORMAT_MODEL),
+              schema: z.object({
+                markdown: z.string().describe("The reformatted GitHub-Flavored Markdown document."),
+              }),
+              system: FORMAT_SYSTEM_PROMPT,
+              prompt: input.text,
+              temperature: 0.2,
+              maxOutputTokens: 8192,
+              experimental_telemetry: { isEnabled: true, functionId: "polish-markdown" },
+            });
+
+            updateActiveObservation({ output: object.markdown });
+            return { markdown: object.markdown };
+          } catch (error) {
+            console.error("polishMarkdown failed", error);
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Could not format the note. Please try again.",
+            });
+          }
+        }),
+      { asType: "span" },
+    );
   }),
 });

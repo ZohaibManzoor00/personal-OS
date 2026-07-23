@@ -1,6 +1,7 @@
 import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import { embedNode } from "@/features/knowledge/server/embeddings";
+import { langfuseSpanProcessor } from "@/instrumentation.node";
 import { prisma } from "@/lib/db";
 import { inngest } from "./client";
 
@@ -54,7 +55,15 @@ export const syncEmbeddings = inngest.createFunction(
 
     const results: Array<{ id: string } & Awaited<ReturnType<typeof embedNode>>> = [];
     for (const id of staleIds) {
-      const result = await step.run(`embed-${id}`, () => embedNode(id));
+      const result = await step.run(`embed-${id}`, async () => {
+        try {
+          return await embedNode(id);
+        } finally {
+          // Each Inngest step can run in its own invocation; flush the trace
+          // before this one returns so its spans aren't lost when it freezes.
+          await langfuseSpanProcessor.forceFlush();
+        }
+      });
       results.push({ id, ...result });
     }
 

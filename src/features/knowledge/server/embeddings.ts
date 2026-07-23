@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { openai } from "@ai-sdk/openai";
+import { propagateAttributes, startActiveObservation, updateActiveObservation } from "@langfuse/tracing";
 import { embed, embedMany } from "ai";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
@@ -106,37 +107,63 @@ export const embedNode = async (nodeId: string): Promise<EmbedNodeResult> => {
     return { status: "unchanged" };
   }
 
-  const chunks = chunkText(source);
+  // Trace the re-embed as one pipeline: a node comes in, gets chunked,
+  // embedded, and stored. The `embedMany` generation nests under this span so
+  // model + token usage show up in Langfuse. Unchanged/missing nodes bail out
+  // above, so a trace only exists when real embedding work happens.
+  return startActiveObservation(
+    "embed-node",
+    () =>
+      propagateAttributes({ userId: node.userId, tags: ["embeddings"], metadata: { section: node.section } }, async () => {
+        const chunks = chunkText(source);
 
-  const embeddings = chunks.length
-    ? (
-        await embedMany({
-          model: openai.embedding(EMBEDDING_MODEL),
-          values: chunks,
-        })
-      ).embeddings
-    : [];
+        updateActiveObservation({
+          input: { nodeId, title: node.title, section: node.section },
+          metadata: { chunkCount: chunks.length },
+        });
 
-  await prisma.$transaction(async (tx) => {
-    await tx.nodeChunk.deleteMany({ where: { nodeId } });
+        const embeddings = chunks.length
+          ? (
+              await embedMany({
+                model: openai.embedding(EMBEDDING_MODEL),
+                values: chunks,
+                experimental_telemetry: {
+                  isEnabled: true,
+                  functionId: "embed-node-chunks",
+                  // The 1536-dim vectors are just noise in the trace UI — keep
+                  // the chunk text as input but drop the embedding output.
+                  recordOutputs: false,
+                  metadata: { nodeId, section: node.section },
+                },
+              })
+            ).embeddings
+          : [];
 
-    for (let i = 0; i < chunks.length; i++) {
-      await tx.$executeRaw`
-        INSERT INTO "NodeChunk" ("id", "nodeId", "userId", "section", "chunkIndex", "content", "embedding", "createdAt")
-        VALUES (
-          ${randomUUID()}, ${nodeId}, ${node.userId}, ${node.section}, ${i}, ${chunks[i]},
-          ${toVectorLiteral(embeddings[i])}::vector, NOW()
-        )
-      `;
-    }
+        await prisma.$transaction(async (tx) => {
+          await tx.nodeChunk.deleteMany({ where: { nodeId } });
 
-    await tx.node.update({
-      where: { id: nodeId },
-      data: { embeddedAt: new Date(), embeddedHash: hash },
-    });
-  });
+          for (let i = 0; i < chunks.length; i++) {
+            await tx.$executeRaw`
+              INSERT INTO "NodeChunk" ("id", "nodeId", "userId", "section", "chunkIndex", "content", "embedding", "createdAt")
+              VALUES (
+                ${randomUUID()}, ${nodeId}, ${node.userId}, ${node.section}, ${i}, ${chunks[i]},
+                ${toVectorLiteral(embeddings[i])}::vector, NOW()
+              )
+            `;
+          }
 
-  return { status: "embedded", chunkCount: chunks.length };
+          await tx.node.update({
+            where: { id: nodeId },
+            data: { embeddedAt: new Date(), embeddedHash: hash },
+          });
+        });
+
+        const result = { status: "embedded", chunkCount: chunks.length } as const;
+        updateActiveObservation({ output: result });
+        return result;
+      }),
+    { asType: "span" },
+  );
 };
 
 export type SearchChunk = {
@@ -179,6 +206,12 @@ export const searchChunks = async ({
   const { embedding } = await embed({
     model: openai.embedding(EMBEDDING_MODEL),
     value: trimmed,
+    experimental_telemetry: {
+      isEnabled: true,
+      functionId: "embed-search-query",
+      // Keep the query text as input; the vector output is noise in the UI.
+      recordOutputs: false,
+    },
   });
   const literal = toVectorLiteral(embedding);
 

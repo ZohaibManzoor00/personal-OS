@@ -1,14 +1,6 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  ChevronDownIcon,
-  GaugeIcon,
-  SparklesIcon,
-  TriangleAlertIcon,
-} from "lucide-react";
+import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, GaugeIcon, SparklesIcon, TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -19,7 +11,7 @@ import { getSectionIcon } from "@/features/dashboard/lib/section-meta";
 import { KnowledgeMarkdown } from "@/features/knowledge/components/knowledge-markdown";
 import { buildNodeHref } from "@/features/knowledge/lib/search-navigation";
 import { cn } from "@/lib/utils";
-import { useTRPC } from "@/trpc/client";
+import { getStreamingTRPCClient } from "@/trpc/client";
 
 type ChatSource = {
   id: string;
@@ -47,6 +39,7 @@ type ChatTrace = {
   includedChunkCount: number;
   sourceCount: number;
   retrievalDurationMs: number;
+  timeToFirstTokenMs: number | null;
   generationDurationMs: number;
   totalDurationMs: number;
 };
@@ -57,6 +50,7 @@ type ChatMessage = {
   content: string;
   sources?: ChatSource[];
   trace?: ChatTrace;
+  followups?: string[];
 };
 
 const SUGGESTIONS = [
@@ -66,18 +60,12 @@ const SUGGESTIONS = [
 ];
 
 export const ChatPanel = () => {
-  const trpc = useTRPC();
   const { isOwner } = useIsOwner();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [atBottom, setAtBottom] = useState(true);
+  const [isStreaming, setIsStreaming] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  const sendMutation = useMutation(
-    trpc.chat.send.mutationOptions({
-      onError: (error) => toast.error(error.message),
-    }),
-  );
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     const el = scrollRef.current;
@@ -85,11 +73,12 @@ export const ChatPanel = () => {
     el.scrollTo({ top: el.scrollHeight, behavior });
   }, []);
 
-  // Follow the conversation as it grows, but don't yank the user back down if
-  // they've scrolled up to read earlier messages.
+  // Follow the conversation as it grows (including each streamed token), but
+  // don't yank the user back down if they've scrolled up to read earlier
+  // messages.
   useEffect(() => {
     if (atBottom) scrollToBottom();
-  }, [messages, sendMutation.isPending, atBottom, scrollToBottom]);
+  }, [messages, isStreaming, atBottom, scrollToBottom]);
 
   const onScroll = () => {
     const el = scrollRef.current;
@@ -100,33 +89,51 @@ export const ChatPanel = () => {
 
   const send = async (raw: string) => {
     const content = raw.trim();
-    if (!content || sendMutation.isPending) return;
+    if (!content || isStreaming) return;
 
-    const next: ChatMessage[] = [
-      ...messages,
-      { id: crypto.randomUUID(), role: "user", content },
-    ];
-    setMessages(next);
+    const history: ChatMessage[] = [...messages, { id: crypto.randomUUID(), role: "user", content }];
+    // An empty assistant bubble we fill in as tokens stream. Tracking its id
+    // lets us patch just this message on each event without touching the rest.
+    const assistantId = crypto.randomUUID();
+
+    setMessages([...history, { id: assistantId, role: "assistant", content: "" }]);
     setInput("");
     // Sending is an explicit intent to be at the latest message.
     setAtBottom(true);
+    setIsStreaming(true);
+
+    const patchAssistant = (patch: (message: ChatMessage) => ChatMessage) =>
+      setMessages((current) => current.map((message) => (message.id === assistantId ? patch(message) : message)));
 
     try {
-      const { text, sources, trace } = await sendMutation.mutateAsync({
-        messages: next.map(({ role, content }) => ({ role, content })),
+      const stream = await getStreamingTRPCClient().chat.send.mutate({
+        messages: history.map(({ role, content }) => ({ role, content })),
       });
-      setMessages((current) => [
-        ...current,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: text,
-          sources,
-          trace,
-        },
-      ]);
-    } catch {
-      // Surfaced via the mutation's onError toast.
+
+      for await (const event of stream) {
+        if (event.type === "sources") {
+          patchAssistant((message) => ({ ...message, sources: event.sources }));
+        } else if (event.type === "delta") {
+          patchAssistant((message) => ({
+            ...message,
+            content: message.content + event.text,
+          }));
+        } else if (event.type === "trace") {
+          patchAssistant((message) => ({ ...message, trace: event.trace }));
+        } else if (event.type === "followups") {
+          patchAssistant((message) => ({
+            ...message,
+            followups: event.followups,
+          }));
+        }
+      }
+    } catch (error) {
+      // Drop the assistant bubble if nothing streamed in; keep any partial text
+      // so the user still sees what arrived before the failure.
+      setMessages((current) => current.filter((message) => message.id !== assistantId || message.content.length > 0));
+      toast.error(error instanceof Error ? error.message : "Could not reach the assistant. Please try again.");
+    } finally {
+      setIsStreaming(false);
     }
   };
 
@@ -144,11 +151,7 @@ export const ChatPanel = () => {
       {/* Soft blur so messages dissolve into the top edge as they scroll away. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-8 backdrop-blur-sm mask-[linear-gradient(to_bottom,black,transparent)]" />
 
-      <div
-        ref={scrollRef}
-        onScroll={onScroll}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
-      >
+      <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-1 py-4">
           {empty ? (
             <div className="flex flex-col items-center gap-6 py-16 text-center">
@@ -156,12 +159,8 @@ export const ChatPanel = () => {
                 <SparklesIcon className="size-6" />
               </span>
               <div className="space-y-1">
-                <h2 className="font-heading text-xl font-semibold">
-                  Ask Jarvis anything
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Your AI assistant for everything in your personal OS.
-                </p>
+                <h2 className="font-heading text-xl font-semibold">Ask Jarvis anything</h2>
+                <p className="text-sm text-muted-foreground">Your AI assistant for everything in your personal OS.</p>
               </div>
               <div className="flex flex-wrap justify-center gap-2">
                 {SUGGESTIONS.map((suggestion) => (
@@ -178,12 +177,18 @@ export const ChatPanel = () => {
               </div>
             </div>
           ) : (
-            messages.map((message) => (
-              <ChatBubble key={message.id} message={message} />
+            messages.map((message, index) => (
+              <ChatBubble
+                key={message.id}
+                message={message}
+                // Only the latest turn offers follow-ups, so stale suggestions
+                // from earlier answers don't linger mid-conversation.
+                showFollowups={index === messages.length - 1 && !isStreaming}
+                canSend={isOwner && !isStreaming}
+                onSelectFollowup={(followup) => void send(followup)}
+              />
             ))
           )}
-
-          {sendMutation.isPending && <TypingIndicator />}
         </div>
       </div>
 
@@ -211,15 +216,13 @@ export const ChatPanel = () => {
               onKeyDown={onKeyDown}
               disabled={!isOwner}
               rows={1}
-              placeholder={
-                isOwner ? "Message Jarvis…" : "Chat is available to the owner"
-              }
+              placeholder={isOwner ? "Message Jarvis…" : "Chat is available to the owner"}
               className="max-h-40 min-h-0 flex-1 resize-none border-0 bg-transparent px-2 py-1.5 shadow-none focus-visible:border-0 focus-visible:ring-0"
             />
             <Button
               type="button"
               size="icon"
-              disabled={!isOwner || !input.trim() || sendMutation.isPending}
+              disabled={!isOwner || !input.trim() || isStreaming}
               onClick={() => void send(input)}
               className="size-8 rounded-lg"
               aria-label="Send message"
@@ -236,8 +239,19 @@ export const ChatPanel = () => {
   );
 };
 
-const ChatBubble = ({ message }: { message: ChatMessage }) => {
+const ChatBubble = ({
+  message,
+  showFollowups,
+  canSend,
+  onSelectFollowup,
+}: {
+  message: ChatMessage;
+  showFollowups: boolean;
+  canSend: boolean;
+  onSelectFollowup: (followup: string) => void;
+}) => {
   const isUser = message.role === "user";
+  const followups = !isUser && showFollowups ? (message.followups ?? []) : [];
 
   return (
     <div className={cn("flex gap-3", isUser && "flex-row-reverse")}>
@@ -246,24 +260,44 @@ const ChatBubble = ({ message }: { message: ChatMessage }) => {
           <SparklesIcon className="size-4" />
         </span>
       )}
-      <div
-        className={cn(
-          "min-w-0 max-w-[85%] rounded-2xl px-4 py-2.5 text-sm",
-          isUser
-            ? "bg-primary text-primary-foreground"
-            : "bg-card ring-1 ring-border",
-        )}
-      >
-        {isUser ? (
-          <p className="whitespace-pre-wrap">{message.content}</p>
-        ) : (
-          <>
-            <KnowledgeMarkdown content={message.content} className="prose-sm" />
-            {message.sources && message.sources.length > 0 && (
-              <ChatSources sources={message.sources} />
-            )}
-            {message.trace && <ChatTraceDetails trace={message.trace} />}
-          </>
+      {/* Column so the follow-up bubbles can sit beneath the answer, aligned
+          under it rather than beside the avatar. */}
+      <div className="flex min-w-0 max-w-[85%] flex-col gap-2">
+        <div
+          className={cn(
+            "min-w-0 rounded-2xl px-4 py-2.5 text-sm",
+            isUser ? "bg-primary text-primary-foreground" : "bg-card ring-1 ring-border",
+          )}
+        >
+          {isUser ? (
+            <p className="whitespace-pre-wrap">{message.content}</p>
+          ) : message.content === "" ? (
+            // Waiting on the first streamed token — show the typing animation in
+            // place of the (still empty) answer.
+            <TypingDots />
+          ) : (
+            <>
+              <KnowledgeMarkdown content={message.content} className="prose-sm" />
+              {message.sources && message.sources.length > 0 && <ChatSources sources={message.sources} />}
+              {message.trace && <ChatTraceDetails trace={message.trace} />}
+            </>
+          )}
+        </div>
+
+        {followups.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {followups.map((followup) => (
+              <button
+                key={followup}
+                type="button"
+                disabled={!canSend}
+                onClick={() => onSelectFollowup(followup)}
+                className="rounded-full border border-border bg-card px-3 py-1.5 text-left text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {followup}
+              </button>
+            ))}
+          </div>
         )}
       </div>
     </div>
@@ -273,16 +307,12 @@ const ChatBubble = ({ message }: { message: ChatMessage }) => {
 // Compact, collapsible "how I got here" panel: the raw trace metrics from
 // chat.send. This is the first surface for observability — persistence and a
 // richer admin view come later.
-const formatTokens = (value?: number) =>
-  value === undefined ? "—" : value.toLocaleString();
+const formatTokens = (value?: number) => (value === undefined ? "—" : value.toLocaleString());
 
-const formatMs = (ms: number) =>
-  ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms} ms`;
+const formatMs = (ms: number) => (ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms} ms`);
 
 const formatWarning = (warning: ChatWarning) =>
-  warning.type === "other"
-    ? warning.message
-    : `${warning.feature}${warning.details ? ` — ${warning.details}` : ""} (${warning.type})`;
+  warning.type === "other" ? warning.message : `${warning.feature}${warning.details ? ` — ${warning.details}` : ""} (${warning.type})`;
 
 const ChatTraceDetails = ({ trace }: { trace: ChatTrace }) => {
   const [open, setOpen] = useState(false);
@@ -308,10 +338,12 @@ const ChatTraceDetails = ({ trace }: { trace: ChatTrace }) => {
     },
     {
       label: "Timing",
+      // "Total" lives in the collapsed summary header, so it's omitted here to
+      // keep this group aligned to three rows like the others.
       rows: [
         ["Retrieval", formatMs(trace.retrievalDurationMs)],
+        ["First token", trace.timeToFirstTokenMs === null ? "—" : formatMs(trace.timeToFirstTokenMs)],
         ["Generation", formatMs(trace.generationDurationMs)],
-        ["Total", formatMs(trace.totalDurationMs)],
       ],
     },
   ];
@@ -329,8 +361,7 @@ const ChatTraceDetails = ({ trace }: { trace: ChatTrace }) => {
         Trace
         {/* At-a-glance summary so the key numbers are visible while collapsed. */}
         <span className="font-mono font-normal text-muted-foreground/70">
-          {formatTokens(trace.totalTokens)} tokens ·{" "}
-          {formatMs(trace.totalDurationMs)}
+          {formatTokens(trace.totalTokens)} tokens · {formatMs(trace.totalDurationMs)}
         </span>
         {warningCount > 0 && (
           <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-500">
@@ -338,21 +369,14 @@ const ChatTraceDetails = ({ trace }: { trace: ChatTrace }) => {
             {warningCount}
           </span>
         )}
-        <ChevronDownIcon
-          className={cn(
-            "ml-auto size-3 shrink-0 transition-transform",
-            open && "rotate-180",
-          )}
-        />
+        <ChevronDownIcon className={cn("ml-auto size-3 shrink-0 transition-transform", open && "rotate-180")} />
       </button>
 
       {open && (
         <div className="mt-2.5 space-y-2.5">
           {/* Model + finish reason as a header row above the metric groups. */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-            <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-foreground">
-              {trace.model}
-            </span>
+            <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-foreground">{trace.model}</span>
             <span className="text-muted-foreground">
               finished: <span className="text-foreground">{trace.finishReason}</span>
             </span>
@@ -361,14 +385,9 @@ const ChatTraceDetails = ({ trace }: { trace: ChatTrace }) => {
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
             {groups.map((group) => (
               <dl key={group.label} className="space-y-1">
-                <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
-                  {group.label}
-                </dt>
+                <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">{group.label}</dt>
                 {group.rows.map(([label, value]) => (
-                  <div
-                    key={label}
-                    className="flex justify-between gap-2 text-[11px] text-muted-foreground"
-                  >
+                  <div key={label} className="flex justify-between gap-2 text-[11px] text-muted-foreground">
                     <span>{label}</span>
                     <span className="font-mono text-foreground">{value}</span>
                   </div>
@@ -379,16 +398,11 @@ const ChatTraceDetails = ({ trace }: { trace: ChatTrace }) => {
 
           {trace.warnings && trace.warnings.length > 0 && (
             <div className="space-y-1">
-              <div className="text-[10px] font-medium uppercase tracking-wide text-amber-600/80 dark:text-amber-500/80">
-                Warnings
-              </div>
+              <div className="text-[10px] font-medium uppercase tracking-wide text-amber-600/80 dark:text-amber-500/80">Warnings</div>
               {trace.warnings.map((warning) => {
                 const text = formatWarning(warning);
                 return (
-                  <div
-                    key={`${warning.type}:${text}`}
-                    className="flex items-start gap-1.5 text-[11px] text-amber-600 dark:text-amber-500"
-                  >
+                  <div key={`${warning.type}:${text}`} className="flex items-start gap-1.5 text-[11px] text-amber-600 dark:text-amber-500">
                     <TriangleAlertIcon className="mt-0.5 size-3 shrink-0" />
                     <span>{text}</span>
                   </div>
@@ -404,9 +418,7 @@ const ChatTraceDetails = ({ trace }: { trace: ChatTrace }) => {
 
 const ChatSources = ({ sources }: { sources: ChatSource[] }) => (
   <div className="mt-3 flex flex-wrap gap-1.5 border-t border-border/60 pt-2.5">
-    <span className="w-full text-[11px] font-medium text-muted-foreground">
-      Sources
-    </span>
+    <span className="w-full text-[11px] font-medium text-muted-foreground">Sources</span>
     {sources.map((source) => {
       const Icon = getSectionIcon(source.section);
       return (
@@ -423,19 +435,12 @@ const ChatSources = ({ sources }: { sources: ChatSource[] }) => (
   </div>
 );
 
-const TypingIndicator = () => (
-  <div className="flex gap-3">
-    <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/20">
-      <SparklesIcon className="size-4" />
-    </span>
-    <div className="flex items-center gap-1 rounded-2xl bg-card px-4 py-3 ring-1 ring-border">
-      {[0, 150, 300].map((delay) => (
-        <span
-          key={delay}
-          className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60"
-          style={{ animationDelay: `${delay}ms` }}
-        />
-      ))}
-    </div>
+// The three bouncing dots shown inside an assistant bubble while we wait for
+// the first streamed token. The bubble itself supplies the avatar and card.
+const TypingDots = () => (
+  <div className="flex items-center gap-1 py-1">
+    {[0, 150, 300].map((delay) => (
+      <span key={delay} className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: `${delay}ms` }} />
+    ))}
   </div>
 );
