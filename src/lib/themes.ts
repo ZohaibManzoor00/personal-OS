@@ -38,6 +38,15 @@ export const COLOR_THEMES: ColorTheme[] = [
       accent: "oklch(0.9245 0.0138 92.9892)",
     },
   },
+  {
+    value: "mx-brutalist",
+    label: "MX Brutalist",
+    swatch: {
+      primary: "oklch(0.5687 0.1498 151.9380)",
+      secondary: "oklch(0.6088 0.2498 29.2339)",
+      accent: "oklch(0.7721 0.1727 64.1585)",
+    },
+  },
 ];
 
 export function isValidTheme(value: string | undefined): value is string {
