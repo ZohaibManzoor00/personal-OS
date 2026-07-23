@@ -5,7 +5,7 @@ import z from "zod";
 import { searchChunks } from "@/features/knowledge/server/embeddings";
 import { createTRPCRouter, ownerProcedure } from "@/trpc/init";
 
-const CHAT_MODEL = "gpt-4.1-nano";
+const CHAT_MODEL = "gpt-5.4-mini";
 const CHAT_MAX_CHARS = 8_000;
 
 // How many note chunks to pull into context for each turn.
@@ -21,12 +21,7 @@ Be concise, direct, and genuinely helpful. Use GitHub-flavored Markdown for stru
  * can cite it by name.
  */
 const buildContextBlock = (chunks: Awaited<ReturnType<typeof searchChunks>>) =>
-  chunks
-    .map(
-      (chunk, index) =>
-        `[${index + 1}] ${chunk.title} · ${chunk.section}\n${chunk.content}`,
-    )
-    .join("\n\n");
+  chunks.map((chunk, index) => `[${index + 1}] ${chunk.title} · ${chunk.section}\n${chunk.content}`).join("\n\n");
 
 const messageSchema = z.object({
   role: z.enum(["user", "assistant"]),
@@ -44,62 +39,86 @@ export const chatRouter = createTRPCRouter({
    * matched notes are returned as `sources` so the UI can link back to them.
    * Locked notes (and their subtree) are never retrieved — see searchChunks.
    */
-  send: ownerProcedure
-    .input(z.object({ messages: z.array(messageSchema).min(1).max(50) }))
-    .mutation(async ({ ctx, input }) => {
-      const lastUserMessage = [...input.messages]
-        .reverse()
-        .find((message) => message.role === "user");
+  send: ownerProcedure.input(z.object({ messages: z.array(messageSchema).min(1).max(50) })).mutation(async ({ ctx, input }) => {
+    const startedAt = performance.now();
+    const lastUserMessage = [...input.messages].reverse().find((message) => message.role === "user");
 
-      const chunks = lastUserMessage
-        ? await searchChunks({
-            userId: ctx.auth.user.id,
-            query: lastUserMessage.content,
-            // Chat is owner-only, so the authenticated owner can retrieve their
-            // locked notes too; locked content is only hidden from non-owners.
-            isOwner: ctx.isOwner,
-            limit: RETRIEVAL_LIMIT,
-          })
-        : [];
+    // Everything the vector search returned. Later steps (reranking, score
+    // cutoffs) will narrow this down, so we keep the full set to trace how many
+    // candidates we saw vs. how many actually made it into the prompt.
+    const retrievalStart = performance.now();
+    const candidates = lastUserMessage
+      ? await searchChunks({
+          userId: ctx.auth.user.id,
+          query: lastUserMessage.content,
+          // Chat is owner-only, so the authenticated owner can retrieve their
+          // locked notes too; locked content is only hidden from non-owners.
+          isOwner: ctx.isOwner,
+          limit: RETRIEVAL_LIMIT,
+        })
+      : [];
+    const retrievalDurationMs = Math.round(performance.now() - retrievalStart);
 
-      const context = buildContextBlock(chunks);
-      const system = context
-        ? `${CHAT_SYSTEM_PROMPT}
+    // The chunks actually injected into the prompt. For now that's every
+    // candidate; once reranking lands this becomes a filtered subset.
+    const chunks = candidates;
+
+    const context = buildContextBlock(chunks);
+    const system = context
+      ? `${CHAT_SYSTEM_PROMPT}
 
 Use the notes below — the user's own knowledge base — to answer when they're relevant, and cite them by title. If they don't cover the question, say so and answer from general knowledge.
 
 --- NOTES ---
 ${context}
 --- END NOTES ---`
-        : CHAT_SYSTEM_PROMPT;
+      : CHAT_SYSTEM_PROMPT;
 
-      // Distinct source notes (a note can contribute several chunks), preserving
-      // the relevance order from the search.
-      const sources = [
-        ...new Map(
-          chunks.map((chunk) => [
-            chunk.nodeId,
-            { id: chunk.nodeId, title: chunk.title, section: chunk.section },
-          ]),
-        ).values(),
-      ];
+    // Distinct source notes (a note can contribute several chunks), preserving
+    // the relevance order from the search.
+    const sources = [
+      ...new Map(chunks.map((chunk) => [chunk.nodeId, { id: chunk.nodeId, title: chunk.title, section: chunk.section }])).values(),
+    ];
 
-      try {
-        const { text } = await generateText({
-          model: openai(CHAT_MODEL),
-          system,
-          messages: input.messages,
-          temperature: 0.4,
-          maxOutputTokens: 2048,
-        });
+    try {
+      const generationStart = performance.now();
+      const result = await generateText({
+        model: openai(CHAT_MODEL),
+        system,
+        messages: input.messages,
+        // temperature: 0.4,
+        maxOutputTokens: 2048,
+        timeout: { totalMs: 30_000 },
+      });
+      const generationDurationMs = Math.round(performance.now() - generationStart);
 
-        return { text, sources };
-      } catch (error) {
-        console.error("chat.send failed", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Could not reach the assistant. Please try again.",
-        });
-      }
-    }),
+      const { text, usage, finishReason, warnings } = result;
+
+      // A structured record of how this turn was built: token spend, why the
+      // model stopped, and how retrieval fed the prompt. Returned to the client
+      // so the chat can surface "how I got here"; persistence/eval come later.
+      const trace = {
+        model: CHAT_MODEL,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        totalTokens: usage.totalTokens,
+        finishReason,
+        warnings,
+        retrievedChunkCount: candidates.length,
+        includedChunkCount: chunks.length,
+        sourceCount: sources.length,
+        retrievalDurationMs,
+        generationDurationMs,
+        totalDurationMs: Math.round(performance.now() - startedAt),
+      };
+
+      return { text, sources, trace };
+    } catch (error) {
+      console.error("chat.send failed", error);
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Could not reach the assistant. Please try again.",
+      });
+    }
+  }),
 });

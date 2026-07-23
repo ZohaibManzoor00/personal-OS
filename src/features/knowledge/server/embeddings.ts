@@ -21,8 +21,7 @@ const CHUNK_SIZE = 1500;
  * the title means a note is findable by its heading even when the body doesn't
  * repeat those words.
  */
-const buildSource = (title: string, body: string | null) =>
-  `${title}\n\n${body ?? ""}`.trim();
+const buildSource = (title: string, body: string | null) => `${title}\n\n${body ?? ""}`.trim();
 
 /**
  * Splits text into chunks of roughly CHUNK_SIZE characters, preferring paragraph
@@ -64,16 +63,12 @@ export const chunkText = (text: string): string[] => {
 };
 
 /** Stable hash of the embedded content, used to detect whether a node changed. */
-export const hashContent = (source: string) =>
-  createHash("sha256").update(source).digest("hex");
+export const hashContent = (source: string) => createHash("sha256").update(source).digest("hex");
 
 /** Formats an embedding as a pgvector literal, e.g. "[0.1,0.2,...]". */
 const toVectorLiteral = (embedding: number[]) => `[${embedding.join(",")}]`;
 
-export type EmbedNodeResult =
-  | { status: "missing" }
-  | { status: "unchanged" }
-  | { status: "embedded"; chunkCount: number };
+export type EmbedNodeResult = { status: "missing" } | { status: "unchanged" } | { status: "embedded"; chunkCount: number };
 
 /**
  * (Re)builds the vector chunks for a single node.
@@ -189,9 +184,7 @@ export const searchChunks = async ({
 
   // Owners get []; non-owners get the full locked subtree to exclude.
   const lockedIds = await lockedNodeIds({ ownerUserId: userId, isOwner });
-  const lockedFilter = lockedIds.length
-    ? Prisma.sql`AND c."nodeId" NOT IN (${Prisma.join(lockedIds)})`
-    : Prisma.empty;
+  const lockedFilter = lockedIds.length ? Prisma.sql`AND c."nodeId" NOT IN (${Prisma.join(lockedIds)})` : Prisma.empty;
 
   return prisma.$queryRaw<SearchChunk[]>`
     SELECT
