@@ -16,7 +16,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useIsOwner } from "@/features/auth/hooks/use-is-owner";
 import { getSectionIcon } from "@/features/dashboard/lib/section-meta";
 import type { CitationMap } from "@/features/knowledge/components/knowledge-markdown";
 import { KnowledgeMarkdown } from "@/features/knowledge/components/knowledge-markdown";
@@ -71,15 +70,21 @@ const SUGGESTIONS = [
 ];
 
 export const ChatPanel = () => {
-  const { isOwner } = useIsOwner();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [atBottom, setAtBottom] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   // Lets the user cut a streaming answer short. Held in a ref so the Stop button
   // can reach the in-flight request without re-rendering on every token.
   const abortRef = useRef<AbortController | null>(null);
+
+  // Land in the composer ready to type the moment the page opens, for anyone who
+  // lands here regardless of auth.
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
     const el = scrollRef.current;
@@ -211,7 +216,7 @@ export const ChatPanel = () => {
                 <SparklesIcon className="size-6" />
               </span>
               <div className="space-y-1">
-                <h2 className="font-heading text-xl font-semibold">Ask Jarvis anything</h2>
+                <h2 className="font-heading text-xl font-semibold">Ask anything</h2>
                 <p className="text-sm text-muted-foreground">Your AI assistant for everything in your personal OS.</p>
               </div>
               <div className="flex flex-wrap justify-center gap-2">
@@ -219,7 +224,6 @@ export const ChatPanel = () => {
                   <button
                     key={suggestion}
                     type="button"
-                    disabled={!isOwner}
                     onClick={() => void send(suggestion)}
                     className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -236,12 +240,12 @@ export const ChatPanel = () => {
                 // Only the latest turn offers follow-ups, so stale suggestions
                 // from earlier answers don't linger mid-conversation.
                 showFollowups={index === messages.length - 1 && !isStreaming}
-                canSend={isOwner && !isStreaming}
+                canSend={!isStreaming}
                 onSelectFollowup={(followup) => send(followup)}
                 // Regenerate hangs off the final assistant answer only.
                 showRegenerate={message.role === "assistant" && index === messages.length - 1 && !isStreaming}
                 onRegenerate={regenerate}
-                canEdit={isOwner && !isStreaming}
+                canEdit={!isStreaming}
                 onEditSubmit={(content) => editAndResend(message.id, content)}
               />
             ))
@@ -268,12 +272,12 @@ export const ChatPanel = () => {
         <div className="mx-auto w-full max-w-4xl px-2 sm:px-4">
           <div className="relative flex items-end gap-2 rounded-2xl border border-input bg-card p-2 shadow-xs focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
             <Textarea
+              ref={inputRef}
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={onKeyDown}
-              disabled={!isOwner}
               rows={1}
-              placeholder={isOwner ? "Message Jarvis…" : "Chat is available to the owner"}
+              placeholder="Send a message…"
               className="max-h-40 min-h-0 flex-1 resize-none border-0 bg-transparent px-2 py-1.5 shadow-none focus-visible:border-0 focus-visible:ring-0"
             />
             {isStreaming ? (
@@ -284,7 +288,7 @@ export const ChatPanel = () => {
               <Button
                 type="button"
                 size="icon"
-                disabled={!isOwner || !input.trim()}
+                disabled={!input.trim()}
                 onClick={() => send(input)}
                 className="size-8 rounded-lg"
                 aria-label="Send message"
@@ -294,7 +298,7 @@ export const ChatPanel = () => {
             )}
           </div>
           <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            Jarvis can make mistakes. Enter to send, Shift+Enter for a new line.
+            The assistant can make mistakes. Enter to send, Shift+Enter for a new line.
           </p>
         </div>
       </div>

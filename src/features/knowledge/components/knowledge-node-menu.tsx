@@ -78,7 +78,7 @@ export const KnowledgeNodeMenu = ({ node, onDeleted, className }: Props) => {
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setLocked.mutate({ id: node.id, locked: !node.locked })}>
             {node.locked ? <UnlockIcon className="size-4" /> : <LockIcon className="size-4" />}
-            {node.locked ? "Unlock (make public)" : "Lock (make personal)"}
+            {node.locked ? "Unlock" : "Lock"}
           </DropdownMenuItem>
           {node.type === "PAGE" && (
             <DropdownMenuItem disabled={reindex.isPending} onSelect={() => reindex.mutate({ id: node.id })}>

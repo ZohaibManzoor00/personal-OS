@@ -7,7 +7,7 @@ import { after } from "next/server";
 import z from "zod";
 import { searchChunks } from "@/features/knowledge/server/embeddings";
 import { langfuseSpanProcessor } from "@/instrumentation.node";
-import { createTRPCRouter, ownerProcedure } from "@/trpc/init";
+import { createTRPCRouter, publicProcedure } from "@/trpc/init";
 
 const CHAT_MODEL = "gpt-5.4-mini";
 const CHAT_MAX_CHARS = 8_000;
@@ -30,7 +30,7 @@ const followupsSchema = z.object({
   followups: z.array(z.string().min(1).max(120)).length(FOLLOWUP_COUNT),
 });
 
-const CHAT_SYSTEM_PROMPT = `You are Jarvis, the assistant inside Zo's personal operating system — a knowledge hub of notes across Learnings, Career, Projects, and AI Workflows.
+const CHAT_SYSTEM_PROMPT = `You are the assistant inside Zo's personal operating system — a knowledge hub of notes across Learnings, Career, Projects, and AI Workflows.
 
 Be concise, direct, and genuinely helpful. Use GitHub-flavored Markdown for structure (headings, lists, code blocks) when it aids clarity. When you are unsure, say so rather than inventing facts.`;
 
@@ -54,8 +54,10 @@ const messageSchema = z.object({
 export const chatRouter = createTRPCRouter({
   /**
    * A single streaming turn: takes the running transcript and streams the
-   * assistant's next reply. Owner-only so the app's OpenAI key is never exposed
-   * to read-only visitors.
+   * assistant's next reply. Public — anyone (signed in or not) can chat against
+   * the owner's knowledge base. Retrieval is scoped to the owner's notes, and
+   * locked notes are only pulled when the owner themselves is asking (see the
+   * `isOwner` flag passed to searchChunks); everyone else gets unlocked notes.
    *
    * Implemented as an async generator so the client can render tokens as they
    * arrive instead of waiting for the whole reply. It yields a discriminated
@@ -71,10 +73,14 @@ export const chatRouter = createTRPCRouter({
    * latest user message and inject the top matches into the system prompt.
    * Locked notes (and their subtree) are never retrieved — see searchChunks.
    */
-  send: ownerProcedure.input(z.object({ messages: z.array(messageSchema).min(1).max(50) })).mutation(async function* ({ ctx, input }) {
+  send: publicProcedure.input(z.object({ messages: z.array(messageSchema).min(1).max(50) })).mutation(async function* ({ ctx, input }) {
     const startedAt = performance.now();
     const lastUserMessage = [...input.messages].reverse().find((message) => message.role === "user");
-    const userId = ctx.auth.user.id;
+    // Whose notes we search: always the owner's (the app is their knowledge
+    // base). Who is asking, for tracing/attribution: the signed-in viewer if
+    // there is one, otherwise fall back to the owner / an anonymous label.
+    const ownerUserId = ctx.ownerUserId;
+    const userId = ctx.session?.user.id ?? ownerUserId ?? "anonymous";
 
     // --- Langfuse: one trace per chat turn --------------------------------
     // This is a streaming async generator, so we can't wrap the whole turn in a
@@ -99,16 +105,17 @@ export const chatRouter = createTRPCRouter({
       // cutoffs) will narrow this down, so we keep the full set to trace how many
       // candidates we saw vs. how many actually made it into the prompt.
       const retrievalStart = performance.now();
-      const candidates = lastUserMessage
-        ? await otelContext.with(turnContext, async () => {
+      const candidates =
+        lastUserMessage && ownerUserId
+          ? await otelContext.with(turnContext, async () => {
             const retriever = startObservation("retrieve-context", { input: lastUserMessage.content }, { asType: "retriever" });
             try {
               const results = await otelContext.with(otelTrace.setSpan(turnContext, retriever.otelSpan), () =>
                 searchChunks({
-                  userId,
+                  userId: ownerUserId,
                   query: lastUserMessage.content,
-                  // Chat is owner-only, so the authenticated owner can retrieve their
-                  // locked notes too; locked content is only hidden from non-owners.
+                  // Only the owner asking pulls their locked notes; every other
+                  // visitor is restricted to unlocked notes (and their subtree).
                   isOwner: ctx.isOwner,
                   limit: RETRIEVAL_LIMIT,
                 }),
