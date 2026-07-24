@@ -3,13 +3,18 @@
 import {
   ArrowDownIcon,
   ArrowUpIcon,
+  BriefcaseIcon,
   ChevronDownIcon,
+  CompassIcon,
   GaugeIcon,
+  GraduationCapIcon,
+  type LucideIcon,
   PencilIcon,
   RefreshCwIcon,
   SparklesIcon,
   SquareIcon,
   TriangleAlertIcon,
+  UsersIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -63,10 +68,38 @@ type ChatMessage = {
   followups?: string[];
 };
 
-const SUGGESTIONS = [
-  "Summarize what I've been learning lately",
-  "Draft a standup update from my recent work",
-  "Quiz me on something from my notes",
+// Starter prompts grouped by who's asking, so newcomers can pick the lane that
+// fits them instead of guessing at a flat list of examples.
+const SUGGESTION_GROUPS: Array<{
+  persona: string;
+  tagline: string;
+  icon: LucideIcon;
+  prompts: string[];
+}> = [
+  {
+    persona: "Recruiter",
+    tagline: "Sizing up Zo's work?",
+    icon: BriefcaseIcon,
+    prompts: ["What has Zo shipped recently?", "What are Zo's strengths as an engineer?"],
+  },
+  {
+    persona: "Student",
+    tagline: "Here to learn?",
+    icon: GraduationCapIcon,
+    prompts: ["Quiz me on something from these notes", "Explain a concept Zo's been studying"],
+  },
+  {
+    persona: "Collaborator",
+    tagline: "Working with Zo?",
+    icon: UsersIcon,
+    prompts: ["What projects are in flight right now?", "Draft a standup update from recent work"],
+  },
+  {
+    persona: "Just curious",
+    tagline: "Poking around?",
+    icon: CompassIcon,
+    prompts: ["Summarize what Zo's been learning lately", "Surprise me with something interesting"],
+  },
 ];
 
 export const ChatPanel = () => {
@@ -211,25 +244,45 @@ export const ChatPanel = () => {
       <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-2 py-6 sm:px-4">
           {empty ? (
-            <div className="flex flex-col items-center gap-6 py-16 text-center">
-              <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20">
-                <SparklesIcon className="size-6" />
-              </span>
-              <div className="space-y-1">
-                <h2 className="font-heading text-xl font-semibold">Ask anything</h2>
-                <p className="text-sm text-muted-foreground">Your AI assistant for everything in your personal OS.</p>
+            <div className="flex flex-col items-center gap-8 py-16">
+              <div className="flex flex-col items-center gap-4 text-center">
+                <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20">
+                  <SparklesIcon className="size-6" />
+                </span>
+                <div className="space-y-1">
+                  <h2 className="font-heading text-xl font-semibold">Ask anything</h2>
+                  <p className="text-sm text-muted-foreground">Not sure where to start? Pick who you are.</p>
+                </div>
               </div>
-              <div className="flex flex-wrap justify-center gap-2">
-                {SUGGESTIONS.map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    onClick={() => void send(suggestion)}
-                    className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
+              <div className="grid w-full gap-3 sm:grid-cols-2">
+                {SUGGESTION_GROUPS.map((group) => {
+                  const Icon = group.icon;
+                  return (
+                    <div key={group.persona} className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 text-left">
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <Icon className="size-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground">{group.persona}</p>
+                          <p className="text-xs text-muted-foreground">{group.tagline}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        {group.prompts.map((prompt) => (
+                          <button
+                            key={prompt}
+                            type="button"
+                            onClick={() => void send(prompt)}
+                            className="rounded-lg border border-border/60 bg-background px-3 py-2 text-left text-xs text-muted-foreground transition-colors hover:border-border hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {prompt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ) : (

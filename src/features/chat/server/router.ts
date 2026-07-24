@@ -42,9 +42,7 @@ Be concise, direct, and genuinely helpful. Use GitHub-flavored Markdown for stru
  * chunks always carries the same number.
  */
 const buildContextBlock = (chunks: Awaited<ReturnType<typeof searchChunks>>, sourceNumberByNodeId: Map<string, number>) =>
-  chunks
-    .map((chunk) => `[${sourceNumberByNodeId.get(chunk.nodeId)}] ${chunk.title} · ${chunk.section}\n${chunk.content}`)
-    .join("\n\n");
+  chunks.map((chunk) => `[${sourceNumberByNodeId.get(chunk.nodeId)}] ${chunk.title} · ${chunk.section}\n${chunk.content}`).join("\n\n");
 
 const messageSchema = z.object({
   role: z.enum(["user", "assistant"]),
@@ -108,30 +106,35 @@ export const chatRouter = createTRPCRouter({
       const candidates =
         lastUserMessage && ownerUserId
           ? await otelContext.with(turnContext, async () => {
-            const retriever = startObservation("retrieve-context", { input: lastUserMessage.content }, { asType: "retriever" });
-            try {
-              const results = await otelContext.with(otelTrace.setSpan(turnContext, retriever.otelSpan), () =>
-                searchChunks({
-                  userId: ownerUserId,
-                  query: lastUserMessage.content,
-                  // Only the owner asking pulls their locked notes; every other
-                  // visitor is restricted to unlocked notes (and their subtree).
-                  isOwner: ctx.isOwner,
-                  limit: RETRIEVAL_LIMIT,
-                }),
-              );
-              // Log the matched notes (title/section/score) rather than the full
-              // chunk text — that already lives on the generation's prompt.
-              retriever.update({
-                output: results.map((chunk) => ({ nodeId: chunk.nodeId, title: chunk.title, section: chunk.section, score: chunk.score })),
-                metadata: { retrievedChunks: results.length, retrievalLimit: RETRIEVAL_LIMIT },
-              });
-              return results;
-            } finally {
-              retriever.end();
-            }
-          })
-        : [];
+              const retriever = startObservation("retrieve-context", { input: lastUserMessage.content }, { asType: "retriever" });
+              try {
+                const results = await otelContext.with(otelTrace.setSpan(turnContext, retriever.otelSpan), () =>
+                  searchChunks({
+                    userId: ownerUserId,
+                    query: lastUserMessage.content,
+                    // Only the owner asking pulls their locked notes; every other
+                    // visitor is restricted to unlocked notes (and their subtree).
+                    isOwner: ctx.isOwner,
+                    limit: RETRIEVAL_LIMIT,
+                  }),
+                );
+                // Log the matched notes (title/section/score) rather than the full
+                // chunk text — that already lives on the generation's prompt.
+                retriever.update({
+                  output: results.map((chunk) => ({
+                    nodeId: chunk.nodeId,
+                    title: chunk.title,
+                    section: chunk.section,
+                    score: chunk.score,
+                  })),
+                  metadata: { retrievedChunks: results.length, retrievalLimit: RETRIEVAL_LIMIT },
+                });
+                return results;
+              } finally {
+                retriever.end();
+              }
+            })
+          : [];
       const retrievalDurationMs = Math.round(performance.now() - retrievalStart);
 
       // The chunks actually injected into the prompt. For now that's every
