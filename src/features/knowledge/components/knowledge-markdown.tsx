@@ -1,12 +1,51 @@
 "use client";
 
+import { useState } from "react";
 import type { Options } from "react-markdown";
 import Markdown from "react-markdown";
 import rehypeSlug from "rehype-slug";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { CITATION_HREF_PREFIX, remarkCitations } from "@/features/knowledge/lib/remark-citations";
 import { cn } from "@/lib/utils";
+
+/**
+ * An inline image that opens a full-screen lightbox on click so readers can view
+ * it large without browser zoom. Keyboard accessible via the native button.
+ */
+const LightboxImage = (props: React.ComponentProps<"img">) => {
+  const [open, setOpen] = useState(false);
+  const { className, alt, ...rest } = props;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mx-auto block cursor-zoom-in border-0 bg-transparent p-0"
+        aria-label={alt ? `Enlarge image: ${alt}` : "Enlarge image"}
+      >
+        {/* biome-ignore lint/performance/noImgElement: R2 public asset, no next/image domain config */}
+        <img loading="lazy" alt={alt ?? ""} className={className} {...rest} />
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent
+          showCloseButton
+          className="flex max-h-[95svh] max-w-[95vw] items-center justify-center border-0 bg-transparent p-0 ring-0 sm:max-w-[95vw]"
+        >
+          <DialogTitle className="sr-only">{alt || "Enlarged image"}</DialogTitle>
+          {/* biome-ignore lint/performance/noImgElement: R2 public asset, no next/image domain config */}
+          <img
+            alt={alt ?? ""}
+            {...rest}
+            className="max-h-[95svh] w-auto max-w-full rounded-lg object-contain"
+          />
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+};
 
 /**
  * Inline citation targets, keyed by the 1-based number the model cites (`[1]`,
@@ -80,8 +119,7 @@ export const KnowledgeMarkdown = ({
             }
             return <a target="_blank" rel="noopener noreferrer" href={href} {...props}>{children}</a>;
           },
-          // biome-ignore lint/performance/noImgElement: R2 public asset, no next/image domain config
-          img: ({ node, ...props }) => <img loading="lazy" alt="" {...props} />,
+          img: ({ node, ...props }) => <LightboxImage {...props} />,
         }}
       >
         {content}

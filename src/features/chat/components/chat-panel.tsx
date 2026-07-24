@@ -244,7 +244,7 @@ export const ChatPanel = () => {
       <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-2 py-6 sm:px-4">
           {empty ? (
-            <div className="flex flex-col items-center gap-8 py-16">
+            <div className="flex flex-col items-center gap-8">
               <div className="flex flex-col items-center gap-4 text-center">
                 <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20">
                   <SparklesIcon className="size-6" />
