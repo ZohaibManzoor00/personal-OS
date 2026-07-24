@@ -175,10 +175,53 @@ export type SearchChunk = {
 };
 
 /**
+ * Selects the final chunks from a ranked candidate pool (best-first) so a single
+ * large note can't monopolize the limited context window.
+ *
+ * Two passes, no extra I/O:
+ *   1. Coverage — guarantee the top-scoring chunk of the top `minDistinctNodes`
+ *      distinct notes, so every strongly-matching note gets a seat. This is what
+ *      keeps a flagship note from being buried when a wordier note happens to
+ *      own several of the highest-scoring chunks.
+ *   2. Depth — fill the remaining slots with the highest-scoring chunks left,
+ *      which lets the single most relevant note contribute several chunks on a
+ *      focused deep-dive question.
+ */
+const diversifyCandidates = (
+  candidates: SearchChunk[],
+  { limit, minDistinctNodes }: { limit: number; minDistinctNodes: number },
+): SearchChunk[] => {
+  const picked: SearchChunk[] = [];
+  const pickedRefs = new Set<SearchChunk>();
+  const seenNodes = new Set<string>();
+
+  for (const chunk of candidates) {
+    if (picked.length >= limit || seenNodes.size >= minDistinctNodes) break;
+    if (seenNodes.has(chunk.nodeId)) continue;
+    seenNodes.add(chunk.nodeId);
+    picked.push(chunk);
+    pickedRefs.add(chunk);
+  }
+
+  for (const chunk of candidates) {
+    if (picked.length >= limit) break;
+    if (pickedRefs.has(chunk)) continue;
+    picked.push(chunk);
+    pickedRefs.add(chunk);
+  }
+
+  return picked;
+};
+
+/**
  * Semantic search over a user's embedded note chunks.
  *
- * Embeds the query with the same model used for indexing, then ranks chunks by
- * cosine similarity via the HNSW index (nearest first).
+ * Embeds the query with the same model used for indexing, pulls a wide candidate
+ * pool ranked by cosine similarity via the HNSW index (nearest first), then
+ * diversifies it in memory (see `diversifyCandidates`) so the returned set spans
+ * the most relevant *notes* rather than being dominated by whichever single note
+ * has the most matching chunks. The wide pool + in-memory selection add no extra
+ * round-trips, so latency stays essentially flat versus a plain top-`limit`.
  *
  * Everything is indexed regardless of privacy; locked content is only *hidden at
  * read time* from non-owners. When `isOwner` is false we exclude locked notes
@@ -192,13 +235,21 @@ export const searchChunks = async ({
   query,
   isOwner,
   limit = 8,
-  minScore = 0.2,
+  minScore = 0.15,
+  poolLimit = 40,
+  minDistinctNodes = 4,
 }: {
   userId: string;
   query: string;
   isOwner: boolean;
   limit?: number;
   minScore?: number;
+  // How many candidates to pull before diversifying. Kept well above `limit` so
+  // notes whose relevance is spread across many narrow chunks still make the cut.
+  poolLimit?: number;
+  // How many distinct notes are guaranteed a chunk before slots are filled by
+  // raw score. Caps any one note's dominance of the context.
+  minDistinctNodes?: number;
 }): Promise<SearchChunk[]> => {
   const trimmed = query.trim();
   if (!trimmed) return [];
@@ -219,7 +270,7 @@ export const searchChunks = async ({
   const lockedIds = await lockedNodeIds({ ownerUserId: userId, isOwner });
   const lockedFilter = lockedIds.length ? Prisma.sql`AND c."nodeId" NOT IN (${Prisma.join(lockedIds)})` : Prisma.empty;
 
-  return prisma.$queryRaw<SearchChunk[]>`
+  const candidates = await prisma.$queryRaw<SearchChunk[]>`
     SELECT
       c."nodeId",
       n."title",
@@ -233,6 +284,8 @@ export const searchChunks = async ({
       ${lockedFilter}
       AND 1 - (c."embedding" <=> ${literal}::vector) >= ${minScore}
     ORDER BY c."embedding" <=> ${literal}::vector
-    LIMIT ${limit}
+    LIMIT ${poolLimit}
   `;
+
+  return diversifyCandidates(candidates, { limit, minDistinctNodes });
 };
