@@ -9,6 +9,7 @@ import { inngest } from "@/inngest/client";
 import { langfuseSpanProcessor } from "@/instrumentation.node";
 import { prisma } from "@/lib/db";
 import { deleteObject, getPresignedUploadUrl, getPublicUrl } from "@/lib/r2";
+import { FORMAT_SYSTEM_PROMPT } from "@/prompts/format-notes";
 import { createTRPCRouter, ownerProcedure, publicProcedure } from "@/trpc/init";
 import { HIGHLIGHT_END, HIGHLIGHT_START } from "../lib/search-highlight";
 import { isSectionLocked, KNOWLEDGE_SECTIONS, LOCKED_SECTIONS } from "../lib/sections";
@@ -22,18 +23,6 @@ const RECENT_LIMIT = 5;
 // reformatting prose into Markdown.
 const FORMAT_MODEL = "gpt-4.1-nano";
 const FORMAT_MAX_CHARS = 50_000;
-
-const FORMAT_SYSTEM_PROMPT = `You reformat raw notes into clean Markdown for a strong mid-level software engineer's personal knowledge hub.
-
-The reader is the engineer themselves — NOT a general audience. Optimize for fast skimming and recall, not polish or hand-holding.
-
-Rules:
-- Preserve ALL information, meaning, code, commands, links, and image markdown (![...](...)). Never invent, remove, or "improve" facts.
-- Improve structure and readability only: sensible headings, tight bullet lists, numbered steps for sequences, tables for comparisons.
-- Put code, commands, file paths, and identifiers in fenced code blocks with the correct language tag (or inline code where appropriate).
-- Be concise and technical. Do not add fluff, intros, conclusions, or explanatory commentary that wasn't in the original.
-- Keep the author's own wording where it's already clear; only rewrite for clarity or brevity.
-- Output GitHub-Flavored Markdown only. Do NOT wrap the whole document in a code fence and do NOT add any commentary before or after it.`;
 
 const nodeType = z.enum(["SPACE", "PAGE"]);
 const knowledgeSection = z.enum(KNOWLEDGE_SECTIONS);

@@ -7,6 +7,8 @@ import { after } from "next/server";
 import z from "zod";
 import { searchChunks } from "@/features/knowledge/server/embeddings";
 import { langfuseSpanProcessor } from "@/instrumentation.node";
+import { FOLLOWUP_SYSTEM_PROMPT } from "@/prompts/chat-followups";
+import { buildChatSystemPrompt } from "@/prompts/chat-system";
 import { createTRPCRouter, publicProcedure } from "@/trpc/init";
 
 const CHAT_MODEL = "gpt-5.4-mini";
@@ -18,23 +20,9 @@ const RETRIEVAL_LIMIT = 8;
 // How many follow-up questions to suggest after each answer.
 const FOLLOWUP_COUNT = 3;
 
-const FOLLOWUP_SYSTEM_PROMPT = `You suggest follow-up questions the user might naturally ask next, given the conversation so far.
-
-Rules:
-- Write each one in the user's voice (first person), as if they typed it.
-- Keep them short (under ~8 words) and immediately clickable.
-- Make them distinct from each other and a genuine next step, not a rephrasing of what was just said.
-- Prefer questions that dig deeper into the user's own notes and knowledge base.`;
-
 const followupsSchema = z.object({
   followups: z.array(z.string().min(1).max(120)).length(FOLLOWUP_COUNT),
 });
-
-const CHAT_SYSTEM_PROMPT = `You are the assistant inside Zo's personal operating system — a knowledge hub of notes across Learnings, Career, Projects, and AI Workflows.
-
-Be concise, direct, and genuinely helpful. Use GitHub-flavored Markdown for structure (headings, lists, code blocks) when it aids clarity. When you are unsure, say so rather than inventing facts.
-
-End your answer once the question is addressed. Do not tack on closing suggestions, offers, or next-step prompts (e.g. "Want me to turn this into a one-line resume bullet?") — the reader may be anyone, not the owner, and follow-ups are surfaced separately.`;
 
 /**
  * Wraps the retrieved note chunks into a context block for the system prompt.
@@ -153,15 +141,7 @@ export const chatRouter = createTRPCRouter({
       const sourceNumberByNodeId = new Map(sources.map((source, index) => [source.id, index + 1]));
 
       const context = buildContextBlock(chunks, sourceNumberByNodeId);
-      const system = context
-        ? `${CHAT_SYSTEM_PROMPT}
-
-Use the notes below — the user's own knowledge base — to answer when they're relevant. Each note is prefixed with a bracketed number. When a sentence draws on a note, cite it inline with that number in brackets (e.g. "React batches updates [1]."). Cite only the numbers shown below, place the marker right after the claim it supports, and combine multiple sources as [1][2]. If the notes don't cover the question, say so and answer from general knowledge without citing.
-
---- NOTES ---
-${context}
---- END NOTES ---`
-        : CHAT_SYSTEM_PROMPT;
+      const system = buildChatSystemPrompt(context);
 
       // Emit sources first so the UI can render citations before the answer lands.
       yield { type: "sources" as const, sources };
