@@ -100,21 +100,39 @@ export const dashboardRouter = createTRPCRouter({
     return row ?? EMPTY_STATS;
   }),
 
-  /** Most recently viewed nodes across every section — the "jump back in" row. */
+  /**
+   * Most recently viewed nodes across every section — the "jump back in" row.
+   * Prefers recently viewed pages; only falls back to (or backfills with)
+   * recently viewed folders when there aren't enough pages to fill the row.
+   */
   recentAll: publicProcedure.query(async ({ ctx }) => {
     if (!ctx.ownerUserId) return [];
     const lockedIds = await lockedNodeIds(ctx);
-    return await prisma.node.findMany({
-      where: {
-        userId: ctx.ownerUserId,
-        archivedAt: null,
-        lastViewedAt: { not: null },
-        ...lockedWhere(ctx, lockedIds),
-      },
+
+    const baseWhere = {
+      userId: ctx.ownerUserId,
+      archivedAt: null,
+      lastViewedAt: { not: null },
+      ...lockedWhere(ctx, lockedIds),
+    } as const;
+
+    const pages = await prisma.node.findMany({
+      where: { ...baseWhere, type: "PAGE" },
       orderBy: { lastViewedAt: "desc" },
       take: RECENT_ALL_LIMIT,
       include: coverInclude,
     });
+
+    if (pages.length >= RECENT_ALL_LIMIT) return pages;
+
+    const folders = await prisma.node.findMany({
+      where: { ...baseWhere, type: "SPACE" },
+      orderBy: { lastViewedAt: "desc" },
+      take: RECENT_ALL_LIMIT - pages.length,
+      include: coverInclude,
+    });
+
+    return [...pages, ...folders];
   }),
 
   /**
