@@ -34,7 +34,7 @@ export const KnowledgeSearch = ({ className }: { className?: string }) => {
       <Input
         ref={inputRef}
         data-knowledge-search-input
-        className="bg-background pr-12 pl-9"
+        className="border-sidebar-primary bg-background pr-12 pl-9"
         placeholder={section.searchPlaceholder}
         value={value}
         onChange={(event) => setValue(event.target.value)}

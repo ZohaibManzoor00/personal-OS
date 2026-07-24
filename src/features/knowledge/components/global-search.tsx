@@ -45,7 +45,7 @@ export const GlobalSearch = ({ className }: { className?: string }) => {
         <Input
           ref={inputRef}
           data-knowledge-search-input
-          className="bg-background pr-9 pl-9"
+          className="border-sidebar-primary bg-background pr-9 pl-9"
           placeholder="Search everything"
           value={value}
           onChange={(event) => setValue(event.target.value)}

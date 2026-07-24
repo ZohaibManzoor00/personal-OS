@@ -1,16 +1,6 @@
 "use client";
 
-import {
-  BookIcon,
-  BotIcon,
-  BriefcaseIcon,
-  FolderOpenIcon,
-  HomeIcon,
-  LockIcon,
-  LogInIcon,
-  LogOutIcon,
-  SparklesIcon,
-} from "lucide-react";
+import { BookIcon, BotIcon, BriefcaseIcon, FolderOpenIcon, HomeIcon, LockIcon, LogInIcon, LogOutIcon, SparklesIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -29,6 +19,7 @@ import {
 import { useIsOwner } from "@/features/auth/hooks/use-is-owner";
 import { isSectionLocked, type KnowledgeSection } from "@/features/knowledge/lib/sections";
 import { authClient } from "@/lib/auth-client";
+import { cn } from "@/lib/utils";
 // import { useHasActiveSubscription } from "@/features/subscriptions/hooks/use-subscription";
 
 export const AppSidebar = () => {
@@ -44,7 +35,7 @@ export const AppSidebar = () => {
           <SidebarMenuButton asChild className="gap-x-4 h-10 px-4">
             <Link href="/" prefetch>
               <Image src="/logos/logo.svg" alt="Zeno" width={30} height={30} />
-              <span className="font-semibold text-sm">Zo's Journey</span>
+              <span className="font-semibold text-sm">Zo's OS</span>
             </Link>
           </SidebarMenuButton>
         </SidebarMenuItem>
@@ -59,6 +50,14 @@ export const AppSidebar = () => {
                   // Locked (personal) sections are unavailable to non-owners: shown
                   // with a lock and no link. The owner still gets a working link.
                   const unavailable = locked && !isOwner;
+                  const isActive = item.url === "/" ? pathname === "/" : pathname.startsWith(item.url);
+                  // Lucide icons are stroke-only outlines; on the active route we
+                  // add a soft, theme-aware fill so the icon reads as its "filled"
+                  // counterpart without hardcoding a color.
+                  const iconClassName = cn(
+                    "size-4 transition-colors [&_*]:transition-[fill]",
+                    isActive && "fill-sidebar-primary/25 text-sidebar-primary",
+                  );
 
                   return (
                     <SidebarMenuItem key={item.title}>
@@ -76,12 +75,12 @@ export const AppSidebar = () => {
                       ) : (
                         <SidebarMenuButton
                           tooltip={item.title}
-                          isActive={item.url === "/" ? pathname === "/" : pathname.startsWith(item.url)}
+                          isActive={isActive}
                           asChild
                           className="gap-x-4 h-10 px-4"
                         >
                           <Link href={item.url} prefetch>
-                            <item.icon className="size-4" />
+                            <item.icon className={iconClassName} />
                             <span>{item.title}</span>
                             {locked && <LockIcon className="ml-auto size-3.5 text-muted-foreground" />}
                           </Link>

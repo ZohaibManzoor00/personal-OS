@@ -40,8 +40,8 @@ const spaceMono = Space_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Zo's Journey", template: "%s | Zo" },
-  description: "Zo's journey",
+  title: { default: "Zo's OS", template: "%s | Zo's OS" },
+  description: "Zo's OS",
 };
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
