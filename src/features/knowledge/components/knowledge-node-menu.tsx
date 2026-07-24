@@ -1,6 +1,15 @@
 "use client";
 
-import { CornerUpRightIcon, ImageIcon, LockIcon, MoreHorizontalIcon, PencilIcon, TrashIcon, UnlockIcon } from "lucide-react";
+import {
+  CornerUpRightIcon,
+  ImageIcon,
+  LockIcon,
+  MoreHorizontalIcon,
+  PencilIcon,
+  RefreshCwIcon,
+  TrashIcon,
+  UnlockIcon,
+} from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useIsOwner } from "@/features/auth/hooks/use-is-owner";
 import { cn } from "@/lib/utils";
-import { useSetNodeLocked } from "../hooks/use-knowledge";
+import { useReindexNode, useSetNodeLocked } from "../hooks/use-knowledge";
 import type { KnowledgeNode } from "../types";
 import { KnowledgeDeleteDialog } from "./knowledge-delete-dialog";
 import { KnowledgeImageDialog } from "./knowledge-image-dialog";
@@ -32,6 +41,7 @@ export const KnowledgeNodeMenu = ({ node, onDeleted, className }: Props) => {
   const [imageOpen, setImageOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const setLocked = useSetNodeLocked();
+  const reindex = useReindexNode();
 
   // Read-only for everyone but the owner — no edit affordances at all.
   if (!isOwner) return null;
@@ -70,6 +80,12 @@ export const KnowledgeNodeMenu = ({ node, onDeleted, className }: Props) => {
             {node.locked ? <UnlockIcon className="size-4" /> : <LockIcon className="size-4" />}
             {node.locked ? "Unlock (make public)" : "Lock (make personal)"}
           </DropdownMenuItem>
+          {node.type === "PAGE" && (
+            <DropdownMenuItem disabled={reindex.isPending} onSelect={() => reindex.mutate({ id: node.id })}>
+              <RefreshCwIcon className="size-4" />
+              Reindex
+            </DropdownMenuItem>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem variant="destructive" onSelect={() => setDeleteOpen(true)}>
             <TrashIcon className="size-4" />

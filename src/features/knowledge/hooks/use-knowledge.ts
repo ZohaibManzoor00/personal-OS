@@ -395,6 +395,21 @@ export const useSetNodeLocked = () => {
   );
 };
 
+export const useReindexNode = () => {
+  const trpc = useTRPC();
+
+  return useMutation(
+    trpc.knowledge.reindex.mutationOptions({
+      onSuccess: () => {
+        toast.success("Reindexing — the note will be searchable shortly.");
+      },
+      onError: (error) => {
+        toast.error(`Failed to reindex: ${error.message}`);
+      },
+    }),
+  );
+};
+
 export const useNodeImage = (nodeId: string) => {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

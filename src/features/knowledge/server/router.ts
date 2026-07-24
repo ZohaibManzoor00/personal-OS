@@ -5,6 +5,7 @@ import { generateObject } from "ai";
 import { after } from "next/server";
 import z from "zod";
 import { Prisma } from "@/generated/prisma/client";
+import { inngest } from "@/inngest/client";
 import { langfuseSpanProcessor } from "@/instrumentation.node";
 import { prisma } from "@/lib/db";
 import { deleteObject, getPresignedUploadUrl, getPublicUrl } from "@/lib/r2";
@@ -325,6 +326,21 @@ export const knowledgeRouter = createTRPCRouter({
         },
       });
     }),
+
+  reindex: ownerProcedure.input(z.object({ id: z.string() })).mutation(async ({ ctx, input }) => {
+    const userId = ctx.auth.user.id;
+
+    await prisma.node.findFirstOrThrow({
+      where: { id: input.id, userId },
+      select: { id: true },
+    });
+
+    // Kick off an on-demand embed. `embedNode` short-circuits on an unchanged
+    // content hash, so a redundant reindex only costs a cheap DB touch.
+    await inngest.send({ name: "embeddings/embed-node", data: { nodeId: input.id } });
+
+    return { id: input.id };
+  }),
 
   setLocked: ownerProcedure.input(z.object({ id: z.string(), locked: z.boolean() })).mutation(async ({ ctx, input }) => {
     const userId = ctx.auth.user.id;

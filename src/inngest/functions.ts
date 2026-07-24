@@ -70,3 +70,30 @@ export const syncEmbeddings = inngest.createFunction(
     return { scanned: staleIds.length, results };
   },
 );
+
+/**
+ * Embeds a single node on demand, right now.
+ *
+ * Fired via the "embeddings/embed-node" event (with a `nodeId`) when a note is
+ * saved and we want it searchable immediately, instead of waiting for the next
+ * `syncEmbeddings` tick. It skips the staleness scan and the 2-minute quiet
+ * window entirely and calls `embedNode` directly — which is already idempotent
+ * (unchanged content short-circuits on the hash) and change-aware (a changed
+ * note has all its chunks rebuilt), so firing it redundantly is cheap and safe.
+ */
+export const embedNodeNow = inngest.createFunction(
+  { id: "embed-node-now", triggers: [{ event: "embeddings/embed-node" }] },
+  async ({ event, step }) => {
+    const nodeId = event.data.nodeId as string;
+
+    return await step.run(`embed-${nodeId}`, async () => {
+      try {
+        return { id: nodeId, ...(await embedNode(nodeId)) };
+      } finally {
+        // Flush the trace before the step returns so its spans aren't lost when
+        // the invocation freezes (each step can run in its own invocation).
+        await langfuseSpanProcessor.forceFlush();
+      }
+    });
+  },
+);
