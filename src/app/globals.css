@@ -50,6 +50,9 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  /* Registered as a Tailwind utility (`animate-icon-shake`) so hover/group
+     variants like `group-hover/nav-item:animate-icon-shake` can be generated. */
+  --animate-icon-shake: icon-shake 0.5s ease-in-out;
 }
 
 :root {
@@ -399,4 +402,24 @@
 .knowledge-match-flash {
   border-radius: var(--radius);
   animation: knowledge-match-flash 1.6s ease-out;
+}
+
+/* Playful wiggle for sidebar/nav icons on hover so routes feel animated. */
+@keyframes icon-shake {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  20% {
+    transform: rotate(-9deg);
+  }
+  40% {
+    transform: rotate(7deg);
+  }
+  60% {
+    transform: rotate(-5deg);
+  }
+  80% {
+    transform: rotate(3deg);
+  }
 }

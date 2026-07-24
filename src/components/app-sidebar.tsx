@@ -55,7 +55,7 @@ export const AppSidebar = () => {
                   // add a soft, theme-aware fill so the icon reads as its "filled"
                   // counterpart without hardcoding a color.
                   const iconClassName = cn(
-                    "size-4 transition-colors [&_*]:transition-[fill]",
+                    "size-4 transition-colors [&_*]:transition-[fill] group-hover/nav-item:animate-icon-shake",
                     isActive && "fill-sidebar-primary/25 text-sidebar-primary",
                   );
 
@@ -77,7 +77,7 @@ export const AppSidebar = () => {
                           tooltip={item.title}
                           isActive={isActive}
                           asChild
-                          className="gap-x-4 h-10 px-4"
+                          className="group/nav-item gap-x-4 h-10 px-4"
                         >
                           <Link href={item.url} prefetch>
                             <item.icon className={iconClassName} />
