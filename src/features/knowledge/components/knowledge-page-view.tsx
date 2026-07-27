@@ -43,13 +43,13 @@ const KnowledgePageContent = ({ nodeId, headerRef }: { nodeId: string; headerRef
   const goToParent = () => router.push(node.parentId ? `${section.basePath}/${node.parentId}` : section.basePath);
 
   return (
-    // The negative margin on the TOC and the wider gap cancel out so the doc
-    // card stays put, while the TOC shifts left into the gutter for breathing
-    // room. Only applies at xl, where the TOC is actually visible.
+    // Wider gap at xl gives the TOC breathing room from the doc without pulling
+    // it toward the left edge — so it stays a consistent distance from the app
+    // sidebar whether that sidebar is expanded or collapsed.
     <div className="flex items-start gap-8 xl:gap-16">
       <KnowledgeToc
         rootSelector="[data-knowledge-body]"
-        className="sticky top-20 hidden max-h-[calc(100vh-6rem)] w-64 shrink-0 self-start overflow-y-auto py-1 xl:-ml-8 xl:block"
+        className="sticky top-20 hidden max-h-[calc(100vh-6rem)] w-64 shrink-0 self-start overflow-y-auto py-1 xl:block"
       />
       <div className="min-w-0 flex-1 rounded-xl border bg-card p-6 shadow-sm sm:p-8 lg:p-10">
         <KnowledgeEditor nodeId={nodeId} onDeleted={goToParent} sentinelRef={headerRef} />
