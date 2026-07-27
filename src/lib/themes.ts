@@ -39,12 +39,21 @@ export const COLOR_THEMES: ColorTheme[] = [
     },
   },
   {
-    value: "mx-brutalist",
-    label: "MX Brutalist",
+    value: "wikipedia",
+    label: "Bold Wikipedia",
     swatch: {
-      primary: "oklch(0.5687 0.1498 151.9380)",
-      secondary: "oklch(0.6088 0.2498 29.2339)",
-      accent: "oklch(0.7721 0.1727 64.1585)",
+      primary: "hsl(214, 85%, 45%)",
+      secondary: "hsl(210, 20%, 96%)",
+      accent: "hsl(214, 85%, 96%)",
+    },
+  },
+  {
+    value: "designbyte",
+    label: "DesignByte",
+    swatch: {
+      primary: "oklch(0.8545 0.1675 159.6564)",
+      secondary: "oklch(0.9933 0.0011 197.1390)",
+      accent: "oklch(0.9947 0.0074 164.9465)",
     },
   },
 ];

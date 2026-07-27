@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import {
+  Chakra_Petch,
   Geist,
   Geist_Mono,
+  IBM_Plex_Mono,
   Inter,
   JetBrains_Mono,
   Lora,
-  Montserrat,
   Outfit,
-  Space_Mono,
+  Plus_Jakarta_Sans,
 } from "next/font/google";
 import { cookies } from "next/headers";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
@@ -29,15 +30,20 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 const jetbrainsMono = JetBrains_Mono({ variable: "--font-jetbrains-mono", subsets: ["latin"] });
 // Loaded so the "Claude" color theme can switch the UI to Outfit.
 const outfit = Outfit({ variable: "--font-outfit", subsets: ["latin"] });
-// Loaded so the "MX Brutalist" color theme can switch the UI to Montserrat /
-// Lora / Space Mono.
-const montserrat = Montserrat({ variable: "--font-montserrat", subsets: ["latin"] });
-const lora = Lora({ variable: "--font-lora", subsets: ["latin"] });
-const spaceMono = Space_Mono({
-  weight: ["400", "700"],
-  variable: "--font-space-mono",
+// Loaded so the "2077" color theme can switch the UI to Chakra Petch + IBM Plex Mono.
+const chakraPetch = Chakra_Petch({
+  variable: "--font-chakra-petch",
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
 });
+const ibmPlexMono = IBM_Plex_Mono({
+  variable: "--font-ibm-plex-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+// Loaded so the "DesignByte" color theme can switch the UI to Plus Jakarta Sans + Lora.
+const plusJakartaSans = Plus_Jakarta_Sans({ variable: "--font-plus-jakarta-sans", subsets: ["latin"] });
+const lora = Lora({ variable: "--font-lora", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: { default: "Zo's OS", template: "%s | Zo's OS" },
@@ -61,9 +67,10 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           geistMono.variable,
           jetbrainsMono.variable,
           outfit.variable,
-          montserrat.variable,
+          chakraPetch.variable,
+          ibmPlexMono.variable,
+          plusJakartaSans.variable,
           lora.variable,
-          spaceMono.variable,
           "font-sans",
           inter.variable,
         )}
