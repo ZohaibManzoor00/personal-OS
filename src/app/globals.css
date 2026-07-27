@@ -404,6 +404,103 @@
   animation: knowledge-match-flash 1.6s ease-out;
 }
 
+/* --------------------------------------------------------------------------
+ * Syntax highlighting for fenced code blocks (rehype-highlight / highlight.js).
+ * We only color the tokens and leave the code-block background to the existing
+ * `prose-pre:bg-muted` styling, so highlighting composes with every color theme
+ * and with dark mode. Palette is based on Atom One (light + dark).
+ * ------------------------------------------------------------------------ */
+[data-knowledge-body] .hljs-comment,
+[data-knowledge-body] .hljs-quote {
+  color: #a0a1a7;
+  font-style: italic;
+}
+[data-knowledge-body] .hljs-keyword,
+[data-knowledge-body] .hljs-selector-tag,
+[data-knowledge-body] .hljs-literal,
+[data-knowledge-body] .hljs-type {
+  color: #a626a4;
+}
+[data-knowledge-body] .hljs-string,
+[data-knowledge-body] .hljs-regexp,
+[data-knowledge-body] .hljs-addition {
+  color: #50a14f;
+}
+[data-knowledge-body] .hljs-number,
+[data-knowledge-body] .hljs-symbol,
+[data-knowledge-body] .hljs-bullet {
+  color: #986801;
+}
+[data-knowledge-body] .hljs-title,
+[data-knowledge-body] .hljs-title.function_,
+[data-knowledge-body] .hljs-section {
+  color: #4078f2;
+}
+[data-knowledge-body] .hljs-built_in,
+[data-knowledge-body] .hljs-class .hljs-title,
+[data-knowledge-body] .hljs-attr,
+[data-knowledge-body] .hljs-attribute {
+  color: #c18401;
+}
+[data-knowledge-body] .hljs-variable,
+[data-knowledge-body] .hljs-template-variable,
+[data-knowledge-body] .hljs-name,
+[data-knowledge-body] .hljs-tag,
+[data-knowledge-body] .hljs-deletion {
+  color: #e45649;
+}
+[data-knowledge-body] .hljs-meta {
+  color: #4078f2;
+}
+[data-knowledge-body] .hljs-emphasis {
+  font-style: italic;
+}
+[data-knowledge-body] .hljs-strong {
+  font-weight: 600;
+}
+
+.dark [data-knowledge-body] .hljs-comment,
+.dark [data-knowledge-body] .hljs-quote {
+  color: #7d8799;
+}
+.dark [data-knowledge-body] .hljs-keyword,
+.dark [data-knowledge-body] .hljs-selector-tag,
+.dark [data-knowledge-body] .hljs-literal,
+.dark [data-knowledge-body] .hljs-type {
+  color: #c678dd;
+}
+.dark [data-knowledge-body] .hljs-string,
+.dark [data-knowledge-body] .hljs-regexp,
+.dark [data-knowledge-body] .hljs-addition {
+  color: #98c379;
+}
+.dark [data-knowledge-body] .hljs-number,
+.dark [data-knowledge-body] .hljs-symbol,
+.dark [data-knowledge-body] .hljs-bullet {
+  color: #d19a66;
+}
+.dark [data-knowledge-body] .hljs-title,
+.dark [data-knowledge-body] .hljs-title.function_,
+.dark [data-knowledge-body] .hljs-section {
+  color: #61afef;
+}
+.dark [data-knowledge-body] .hljs-built_in,
+.dark [data-knowledge-body] .hljs-class .hljs-title,
+.dark [data-knowledge-body] .hljs-attr,
+.dark [data-knowledge-body] .hljs-attribute {
+  color: #e5c07b;
+}
+.dark [data-knowledge-body] .hljs-variable,
+.dark [data-knowledge-body] .hljs-template-variable,
+.dark [data-knowledge-body] .hljs-name,
+.dark [data-knowledge-body] .hljs-tag,
+.dark [data-knowledge-body] .hljs-deletion {
+  color: #e06c75;
+}
+.dark [data-knowledge-body] .hljs-meta {
+  color: #61afef;
+}
+
 /* Playful wiggle for sidebar/nav icons on hover so routes feel animated. */
 @keyframes icon-shake {
   0%,

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Options } from "react-markdown";
 import Markdown from "react-markdown";
+import rehypeHighlight from "rehype-highlight";
 import rehypeSlug from "rehype-slug";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
@@ -98,7 +99,20 @@ export const KnowledgeMarkdown = ({
     >
       <Markdown
         remarkPlugins={remarkPlugins}
-        rehypePlugins={[rehypeSlug]}
+        rehypePlugins={[
+          rehypeSlug,
+          // Syntax-highlight fenced code blocks (```ts, ```tsx, ```python, …).
+          // highlight.js has no dedicated tsx/jsx grammars, so alias them onto
+          // the TypeScript/JavaScript ones (both handle JSX). `ignoreMissing`
+          // keeps unknown/unlabeled languages as plain (uncolored) code.
+          [
+            rehypeHighlight,
+            {
+              ignoreMissing: true,
+              aliases: { typescript: ["tsx"], javascript: ["jsx"] },
+            },
+          ],
+        ]}
         components={{
           a: ({ node, href, children, ...props }) => {
             // A citation chip: swap the sentinel hash for the real note href and
