@@ -53,6 +53,10 @@
   /* Registered as a Tailwind utility (`animate-icon-shake`) so hover/group
      variants like `group-hover/nav-item:animate-icon-shake` can be generated. */
   --animate-icon-shake: icon-shake 0.5s ease-in-out;
+  /* Subtle brand-logo motions. Kept slow/low-amplitude so the mark feels alive
+     without distracting; gate with `motion-safe:` at the call site. */
+  --animate-logo-breathe: logo-breathe 4.5s ease-in-out infinite;
+  --animate-logo-shimmer: logo-sheen 1.1s ease-in-out infinite;
 }
 
 :root {
@@ -582,6 +586,28 @@ body.theme-wikipedia {
 }
 .dark [data-knowledge-body] .hljs-meta {
   color: #61afef;
+}
+
+/* Gentle "breathing" opacity pulse for the brand logo. */
+@keyframes logo-breathe {
+  0%,
+  100% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Diagonal sheen sweep across the logo (used for the hover shimmer). */
+@keyframes logo-sheen {
+  0%,
+  100% {
+    transform: translateX(-130%);
+  }
+  50% {
+    transform: translateX(130%);
+  }
 }
 
 /* Playful wiggle for sidebar/nav icons on hover so routes feel animated. */

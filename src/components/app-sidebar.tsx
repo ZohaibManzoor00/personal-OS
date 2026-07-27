@@ -1,9 +1,9 @@
 "use client";
 
 import { BookIcon, BotIcon, BriefcaseIcon, FolderOpenIcon, HomeIcon, LockIcon, LogInIcon, LogOutIcon, SparklesIcon } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { Logo } from "@/components/logo";
 import { ThemeSettings } from "@/components/theme-settings";
 import {
   Sidebar,
@@ -34,7 +34,7 @@ export const AppSidebar = () => {
         <SidebarMenuItem>
           <SidebarMenuButton asChild className="gap-x-4 h-10 px-4">
             <Link href="/" prefetch>
-              <Image src="/logos/logo.svg" alt="Zeno" width={30} height={30} />
+              <Logo size={30} />
               <span className="font-semibold text-sm">Zo's OS</span>
             </Link>
           </SidebarMenuButton>
