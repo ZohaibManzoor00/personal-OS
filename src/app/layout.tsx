@@ -6,9 +6,7 @@ import {
   IBM_Plex_Mono,
   Inter,
   JetBrains_Mono,
-  Lora,
   Outfit,
-  Plus_Jakarta_Sans,
 } from "next/font/google";
 import { cookies } from "next/headers";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
@@ -41,9 +39,6 @@ const ibmPlexMono = IBM_Plex_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 });
-// Loaded so the "DesignByte" color theme can switch the UI to Plus Jakarta Sans + Lora.
-const plusJakartaSans = Plus_Jakarta_Sans({ variable: "--font-plus-jakarta-sans", subsets: ["latin"] });
-const lora = Lora({ variable: "--font-lora", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: { default: "Zo's OS", template: "%s | Zo's OS" },
@@ -69,8 +64,6 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           outfit.variable,
           chakraPetch.variable,
           ibmPlexMono.variable,
-          plusJakartaSans.variable,
-          lora.variable,
           "font-sans",
           inter.variable,
         )}

@@ -47,15 +47,6 @@ export const COLOR_THEMES: ColorTheme[] = [
       accent: "hsl(214, 85%, 96%)",
     },
   },
-  {
-    value: "designbyte",
-    label: "DesignByte",
-    swatch: {
-      primary: "oklch(0.8545 0.1675 159.6564)",
-      secondary: "oklch(0.9933 0.0011 197.1390)",
-      accent: "oklch(0.9947 0.0074 164.9465)",
-    },
-  },
 ];
 
 export function isValidTheme(value: string | undefined): value is string {
