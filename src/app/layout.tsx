@@ -24,16 +24,15 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
-// Loaded so the "Teenage Lobster" color theme can switch the UI to JetBrains Mono.
 const jetbrainsMono = JetBrains_Mono({ variable: "--font-jetbrains-mono", subsets: ["latin"] });
-// Loaded so the "Claude" color theme can switch the UI to Outfit.
 const outfit = Outfit({ variable: "--font-outfit", subsets: ["latin"] });
-// Loaded so the "2077" color theme can switch the UI to Chakra Petch + IBM Plex Mono.
+
 const chakraPetch = Chakra_Petch({
   variable: "--font-chakra-petch",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
 });
+
 const ibmPlexMono = IBM_Plex_Mono({
   variable: "--font-ibm-plex-mono",
   subsets: ["latin"],
