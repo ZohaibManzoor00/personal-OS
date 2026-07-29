@@ -235,7 +235,11 @@ export const searchChunks = async ({
   query,
   isOwner,
   limit = 8,
-  minScore = 0.15,
+  // Cosine-similarity floor a chunk must clear to be a candidate. Tuned for
+  // text-embedding-3-small, whose genuinely-relevant matches sit around 0.3+
+  // while loosely-related notes trail below — a lower floor (e.g. 0.15) let
+  // almost every note through and padded answers with off-topic sources.
+  minScore = 0.3,
   poolLimit = 40,
   minDistinctNodes = 4,
 }: {

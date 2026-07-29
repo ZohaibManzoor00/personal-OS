@@ -365,6 +365,20 @@ export const ChatPanel = () => {
 const buildCitations = (sources: ChatSource[]): CitationMap =>
   Object.fromEntries(sources.map((source, index) => [index + 1, { href: buildNodeHref(source.section, source.id), title: source.title }]));
 
+// The distinct citation numbers the answer actually references. We retrieve a
+// wide net of chunks, but only the notes the model cites with a `[n]` marker
+// belong in the Sources strip — listing every retrieved note surfaces off-topic
+// results the answer never used. Numbers outside the known source range are
+// ignored so a stray `[9]` can't sneak in.
+const usedCitationNumbers = (content: string, sourceCount: number): Set<number> => {
+  const used = new Set<number>();
+  for (const match of content.matchAll(/\[(\d+)\]/g)) {
+    const number = Number(match[1]);
+    if (number >= 1 && number <= sourceCount) used.add(number);
+  }
+  return used;
+};
+
 const ChatBubble = ({
   message,
   showFollowups,
@@ -386,7 +400,15 @@ const ChatBubble = ({
 }) => {
   const isUser = message.role === "user";
   const followups = !isUser && showFollowups ? (message.followups ?? []) : [];
-  const citations = message.sources && message.sources.length > 0 ? buildCitations(message.sources) : undefined;
+  const sources = message.sources ?? [];
+  const citations = sources.length > 0 ? buildCitations(sources) : undefined;
+  // Only show the notes the answer actually cited, keeping each source's
+  // original 1-based number so the strip's chips still line up with the inline
+  // `[n]` markers even when earlier sources went uncited.
+  const used = sources.length > 0 ? usedCitationNumbers(message.content, sources.length) : undefined;
+  const citedSources = used
+    ? sources.map((source, index) => ({ source, number: index + 1 })).filter(({ number }) => used.has(number))
+    : [];
 
   // Local edit state for user messages: entering edit mode swaps the bubble for
   // a textarea seeded with the current text.
@@ -461,7 +483,7 @@ const ChatBubble = ({
           ) : (
             <>
               <KnowledgeMarkdown content={message.content} className="prose-sm" citations={citations} />
-              {message.sources && message.sources.length > 0 && <ChatSources sources={message.sources} />}
+              {citedSources.length > 0 && <ChatSources sources={citedSources} />}
               {message.trace && <ChatTraceDetails trace={message.trace} />}
             </>
           )}
@@ -622,10 +644,10 @@ const ChatTraceDetails = ({ trace }: { trace: ChatTrace }) => {
   );
 };
 
-const ChatSources = ({ sources }: { sources: ChatSource[] }) => (
+const ChatSources = ({ sources }: { sources: Array<{ source: ChatSource; number: number }> }) => (
   <div className="mt-3 flex flex-wrap gap-1.5 border-t border-border/60 pt-2.5">
     <span className="w-full text-[11px] font-medium text-muted-foreground">Sources</span>
-    {sources.map((source, index) => {
+    {sources.map(({ source, number }) => {
       const Icon = getSectionIcon(source.section);
       return (
         <Link
@@ -635,7 +657,7 @@ const ChatSources = ({ sources }: { sources: ChatSource[] }) => (
         >
           {/* The number ties each source back to its inline [n] citation. */}
           <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
-            {index + 1}
+            {number}
           </span>
           <Icon className="size-3 shrink-0" />
           <span className="truncate">{source.title}</span>
