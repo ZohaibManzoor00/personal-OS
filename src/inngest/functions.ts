@@ -22,9 +22,12 @@ const BATCH_SIZE = 25;
 /**
  * Keeps the vector index in sync with the notes.
  *
- * Runs on a schedule (and can be fired on demand via the "embeddings/sync"
- * event) to find notes whose content changed since they were last embedded and
- * re-embed them. Two rules keep it cheap and out of the way while you type:
+ * Fired on demand via the "embeddings/sync" event whenever a note is saved,
+ * with a once-a-day cron as a safety net that re-embeds notes whose content
+ * changed since they were last embedded. The event handles the common case, so
+ * the cron mostly finds nothing — a daily sweep is enough to catch anything a
+ * missed event left behind. Two rules keep it cheap and out of the way while
+ * you type:
  *
  * - Staleness is derived from the data itself (`embeddedAt` is null, or
  *   `updatedAt` is newer), so nothing has to be enqueued on save and the job is
@@ -36,7 +39,7 @@ const BATCH_SIZE = 25;
 export const syncEmbeddings = inngest.createFunction(
   {
     id: "sync-embeddings",
-    triggers: [{ cron: "*/5 * * * *" }, { event: "embeddings/sync" }],
+    triggers: [{ cron: "0 0 * * *" }, { event: "embeddings/sync" }],
   },
   async ({ step }) => {
     const staleIds = await step.run("find-stale-nodes", async () => {
