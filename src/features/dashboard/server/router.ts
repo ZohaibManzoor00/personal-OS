@@ -113,35 +113,40 @@ export const dashboardRouter = createTRPCRouter({
    * Prefers recently viewed pages; only falls back to (or backfills with)
    * recently viewed folders when there aren't enough pages to fill the row.
    */
-  recentAll: publicProcedure.query(async ({ ctx }) => {
-    if (!ctx.ownerUserId) return [];
-    const lockedIds = await lockedNodeIds(ctx);
+  recentAll: publicProcedure
+    .input(
+      z.object({ limit: z.number().int().min(1).max(50).optional() }).optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      if (!ctx.ownerUserId) return [];
+      const lockedIds = await lockedNodeIds(ctx);
+      const limit = input?.limit ?? RECENT_ALL_LIMIT;
 
-    const baseWhere = {
-      userId: ctx.ownerUserId,
-      archivedAt: null,
-      lastViewedAt: { not: null },
-      ...lockedWhere(ctx, lockedIds),
-    } as const;
+      const baseWhere = {
+        userId: ctx.ownerUserId,
+        archivedAt: null,
+        lastViewedAt: { not: null },
+        ...lockedWhere(ctx, lockedIds),
+      } as const;
 
-    const pages = await prisma.node.findMany({
-      where: { ...baseWhere, type: "PAGE" },
-      orderBy: { lastViewedAt: "desc" },
-      take: RECENT_ALL_LIMIT,
-      include: coverInclude,
-    });
+      const pages = await prisma.node.findMany({
+        where: { ...baseWhere, type: "PAGE" },
+        orderBy: { lastViewedAt: "desc" },
+        take: limit,
+        include: coverInclude,
+      });
 
-    if (pages.length >= RECENT_ALL_LIMIT) return pages;
+      if (pages.length >= limit) return pages;
 
-    const folders = await prisma.node.findMany({
-      where: { ...baseWhere, type: "SPACE" },
-      orderBy: { lastViewedAt: "desc" },
-      take: RECENT_ALL_LIMIT - pages.length,
-      include: coverInclude,
-    });
+      const folders = await prisma.node.findMany({
+        where: { ...baseWhere, type: "SPACE" },
+        orderBy: { lastViewedAt: "desc" },
+        take: limit - pages.length,
+        include: coverInclude,
+      });
 
-    return [...pages, ...folders];
-  }),
+      return [...pages, ...folders];
+    }),
 
   /**
    * The most recent pages per section, for the dashboard's recents carousels.

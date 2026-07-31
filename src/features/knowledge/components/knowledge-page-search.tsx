@@ -5,13 +5,12 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { useKnowledgeSearch, useSearchFocusHotkey } from "../hooks/use-knowledge";
+import { useKnowledgeSearch } from "../hooks/use-knowledge";
 import { groupSearchResultsBySection } from "../lib/group-results";
 import { buildNodeHref } from "../lib/search-navigation";
 import { getCoverImage } from "../types";
 import { Highlighted, ResultBreadcrumbTitle } from "./knowledge-highlight";
 import { useKnowledgeSection } from "./knowledge-section-context";
-import { SearchKbd } from "./search-kbd";
 
 const SEARCH_DEBOUNCE = 250;
 
@@ -37,8 +36,6 @@ export const KnowledgePageSearch = ({
   const [deferred, setDeferred] = useState(value);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useSearchFocusHotkey(inputRef);
 
   useEffect(() => {
     const timer = setTimeout(() => setDeferred(value), SEARCH_DEBOUNCE);
@@ -91,9 +88,7 @@ export const KnowledgePageSearch = ({
           >
             <XIcon className="size-4" />
           </button>
-        ) : (
-          <SearchKbd className="absolute top-1/2 right-2 -translate-y-1/2" />
-        )}
+        ) : null}
       </div>
 
       {open ? (

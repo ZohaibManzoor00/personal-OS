@@ -117,8 +117,8 @@ const RecentSectionCard = ({
   const basePath = resolveSectionBasePath(group.section);
 
   return (
-    <Card className="gap-0 overflow-hidden p-0">
-      <Carousel opts={{ align: "start", dragFree: true }}>
+    <Card className="min-w-0 gap-0 overflow-hidden p-0">
+      <Carousel opts={{ align: "start", dragFree: true }} className="min-w-0">
         <div className="group/section relative h-24 overflow-hidden">
           <Link href={basePath} prefetch className="absolute inset-0 block">
             {group.coverUrl ? (
@@ -143,7 +143,7 @@ const RecentSectionCard = ({
           <CarouselNav />
         </div>
 
-        <div className="p-3">
+        <div className="min-w-0 overflow-hidden p-3">
           <CarouselContent className="-ml-2">
             {group.nodes.map((node) => (
               <CarouselItem key={node.id} className="basis-auto pl-2">
@@ -168,7 +168,11 @@ export const DashboardRecents = () => {
   if (groups.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-4">
+    // A single-column grid whose track has an explicit 0 minimum
+    // (`minmax(0,1fr)`). Unlike a flex column, this can never be widened past
+    // its container by the carousels' intrinsic content width, so the page
+    // never scrolls horizontally.
+    <div className="grid w-full grid-cols-[minmax(0,1fr)] gap-4">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-medium text-muted-foreground">Recents</h2>
         <ToggleGroup

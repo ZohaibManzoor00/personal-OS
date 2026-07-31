@@ -9,13 +9,12 @@ import { HeaderPortal } from "@/components/header-portal";
 import { Button } from "@/components/ui/button";
 import { useIsOwner } from "@/features/auth/hooks/use-is-owner";
 import { RouteCover } from "@/features/route-cover/components/route-cover";
-import { useKnowledgeParams, useListChildren } from "../hooks/use-knowledge";
+import { useListChildren } from "../hooks/use-knowledge";
 import { KnowledgeCollection } from "./knowledge-collection";
 import { KnowledgeEmptyState } from "./knowledge-empty-state";
 import { KnowledgeNodeDialog } from "./knowledge-node-dialog";
 import { KnowledgeRecent } from "./knowledge-recent";
 import { KnowledgeSearch } from "./knowledge-search";
-import { KnowledgeSearchResults } from "./knowledge-search-results";
 import { useKnowledgeSection } from "./knowledge-section-context";
 import { KnowledgeViewToggle } from "./knowledge-view-toggle";
 
@@ -109,12 +108,7 @@ const KnowledgeRecentSection = () => {
 
 const KnowledgeRootContent = ({ onNewSpace, onNewPage }: CreateHandlers) => {
   const section = useKnowledgeSection();
-  const [params] = useKnowledgeParams();
   const { data: items } = useListChildren(null);
-
-  const query = params.search.trim();
-
-  if (query.length > 0) return <KnowledgeSearchResults query={query} />;
 
   if (items.length === 0) {
     return (
