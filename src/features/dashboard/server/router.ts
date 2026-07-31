@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   getKnowledgeSectionConfig,
   isKnowledgeSection,
@@ -14,7 +15,14 @@ import { prisma } from "@/lib/db";
 import { createTRPCRouter, publicProcedure } from "@/trpc/init";
 
 const RECENT_ALL_LIMIT = 3;
-const RECENT_PER_SECTION_LIMIT = 3;
+/** How many recent pages each section's carousel holds. */
+const RECENT_PAGES_PER_SECTION = 12;
+
+/**
+ * Which timestamp drives the recents carousels: "edited" ranks by `updatedAt`
+ * (bumped on every save), "added" ranks by `createdAt` (creation only).
+ */
+const recentSort = z.enum(["edited", "added"]).default("edited");
 
 /** A single vertex in the dashboard knowledge graph. */
 type GraphNode = {
@@ -136,70 +144,79 @@ export const dashboardRouter = createTRPCRouter({
   }),
 
   /**
-   * Top few recent nodes per section. Ranks by last-viewed, falling back to
-   * last-updated so a section that hasn't been opened yet still shows its newest
-   * work instead of being empty. Sections with no nodes at all are omitted.
+   * The most recent pages per section, for the dashboard's recents carousels.
+   * Pages only (folders are excluded). `sort` picks the ranking timestamp:
+   * "edited" (updatedAt, bumped on every save) or "added" (createdAt). Sections
+   * with no pages are omitted.
    */
-  recentPerSection: publicProcedure.query(async ({ ctx }) => {
-    if (!ctx.ownerUserId) return [];
+  recentPagesPerSection: publicProcedure
+    .input(z.object({ sort: recentSort }).default({ sort: "edited" }))
+    .query(async ({ ctx, input }) => {
+      if (!ctx.ownerUserId) return [];
 
-    const lockedIds = await lockedNodeIds(ctx);
-    const ranked = await prisma.$queryRaw<
-      { id: string; section: string; rn: number }[]
-    >`
+      const lockedIds = await lockedNodeIds(ctx);
+      const orderColumn =
+        input.sort === "added"
+          ? Prisma.sql`"createdAt"`
+          : Prisma.sql`"updatedAt"`;
+      const ranked = await prisma.$queryRaw<
+        { id: string; section: string; rn: number }[]
+      >`
       SELECT "id", "section", "rn" FROM (
         SELECT
           "id",
           "section",
           row_number() OVER (
             PARTITION BY "section"
-            ORDER BY COALESCE("lastViewedAt", "updatedAt") DESC
+            ORDER BY ${orderColumn} DESC
           )::int AS "rn"
         FROM "Node"
-        WHERE "userId" = ${ctx.ownerUserId} AND "archivedAt" IS NULL
+        WHERE "userId" = ${ctx.ownerUserId}
+          AND "archivedAt" IS NULL
+          AND "type" = 'PAGE'
           ${lockedSql(ctx, lockedIds)}
       ) ranked
-      WHERE "rn" <= ${RECENT_PER_SECTION_LIMIT}
+      WHERE "rn" <= ${RECENT_PAGES_PER_SECTION}
     `;
 
-    if (ranked.length === 0) return [];
+      if (ranked.length === 0) return [];
 
-    const [nodes, covers] = await Promise.all([
-      prisma.node.findMany({
-        where: { id: { in: ranked.map((r) => r.id) } },
-        include: coverInclude,
-      }),
-      // The banner behind each section card reuses that section's route cover.
-      prisma.routeCover.findMany({
-        where: { userId: ctx.ownerUserId },
-        select: { route: true, url: true },
-      }),
-    ]);
+      const [nodes, covers] = await Promise.all([
+        prisma.node.findMany({
+          where: { id: { in: ranked.map((r) => r.id) } },
+          include: coverInclude,
+        }),
+        // Each carousel row reuses that section's route cover as its accent/fallback.
+        prisma.routeCover.findMany({
+          where: { userId: ctx.ownerUserId },
+          select: { route: true, url: true },
+        }),
+      ]);
 
-    const byId = new Map(nodes.map((node) => [node.id, node]));
-    const rankById = new Map(ranked.map((r) => [r.id, r.rn]));
-    const coverByRoute = new Map(
-      covers.map((cover) => [cover.route, cover.url]),
-    );
+      const byId = new Map(nodes.map((node) => [node.id, node]));
+      const rankById = new Map(ranked.map((r) => [r.id, r.rn]));
+      const coverByRoute = new Map(
+        covers.map((cover) => [cover.route, cover.url]),
+      );
 
-    // Preserve the section order defined in KNOWLEDGE_SECTIONS and the rank order
-    // within each section.
-    return KNOWLEDGE_SECTIONS.map((section) => {
-      const sectionNodes = ranked
-        .filter((r) => r.section === section)
-        .map((r) => byId.get(r.id))
-        .filter((node) => node !== undefined)
-        .sort((a, b) => (rankById.get(a.id) ?? 0) - (rankById.get(b.id) ?? 0));
+      return KNOWLEDGE_SECTIONS.map((section) => {
+        const sectionNodes = ranked
+          .filter((r) => r.section === section)
+          .map((r) => byId.get(r.id))
+          .filter((node) => node !== undefined)
+          .sort(
+            (a, b) => (rankById.get(a.id) ?? 0) - (rankById.get(b.id) ?? 0),
+          );
 
-      return {
-        section: section as KnowledgeSection,
-        coverUrl:
-          coverByRoute.get(getKnowledgeSectionConfig(section).coverRoute) ??
-          null,
-        nodes: sectionNodes,
-      };
-    }).filter((group) => group.nodes.length > 0);
-  }),
+        return {
+          section: section as KnowledgeSection,
+          coverUrl:
+            coverByRoute.get(getKnowledgeSectionConfig(section).coverRoute) ??
+            null,
+          nodes: sectionNodes,
+        };
+      }).filter((group) => group.nodes.length > 0);
+    }),
 
   /**
    * The whole knowledge tree flattened into a force-directed graph: every node

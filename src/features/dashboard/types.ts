@@ -9,9 +9,9 @@ export type DashboardStats = RouterOutput["dashboard"]["stats"];
 export type DashboardRecentNode =
   RouterOutput["dashboard"]["recentAll"][number];
 
-/** Recent nodes grouped under a single section. */
-export type DashboardSectionGroup =
-  RouterOutput["dashboard"]["recentPerSection"][number];
+/** Recent pages grouped under a single section, for the carousels. */
+export type DashboardRecentPagesGroup =
+  RouterOutput["dashboard"]["recentPagesPerSection"][number];
 
 /** Force-directed graph payload: section hubs + nodes, plus parent→child links. */
 export type DashboardGraph = RouterOutput["dashboard"]["graph"];

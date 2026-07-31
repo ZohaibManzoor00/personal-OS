@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { Card } from "@/components/ui/card";
 import { DashboardRecent } from "./dashboard-recent";
-import { DashboardSections } from "./dashboard-sections";
+import { DashboardRecents } from "./dashboard-recents";
 import { DashboardStats } from "./dashboard-stats";
 
 const STAT_SKELETON_KEYS = ["pages", "spaces", "added", "edited", "words"];
@@ -44,11 +44,11 @@ export const DashboardCoverContent = () => {
   );
 };
 
-/** Per-section recents, rendered below the cover in the main content column. */
+/** Per-section recents carousels, rendered below the cover in the main column. */
 export const DashboardSectionsPanel = () => (
   <ErrorBoundary fallback={null}>
     <Suspense fallback={null}>
-      <DashboardSections />
+      <DashboardRecents />
     </Suspense>
   </ErrorBoundary>
 );

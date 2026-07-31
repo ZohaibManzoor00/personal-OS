@@ -11,9 +11,13 @@ export const useDashboardRecentAll = () => {
   return useSuspenseQuery(trpc.dashboard.recentAll.queryOptions());
 };
 
-export const useDashboardRecentPerSection = () => {
+export type RecentSort = "edited" | "added";
+
+export const useDashboardRecentPagesPerSection = (sort: RecentSort) => {
   const trpc = useTRPC();
-  return useSuspenseQuery(trpc.dashboard.recentPerSection.queryOptions());
+  return useSuspenseQuery(
+    trpc.dashboard.recentPagesPerSection.queryOptions({ sort }),
+  );
 };
 
 export const useDashboardGraph = () => {
