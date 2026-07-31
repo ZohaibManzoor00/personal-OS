@@ -136,6 +136,26 @@ export const CommandPalette = () => {
     }
   }, [open]);
 
+  // Focus the search input whenever the search view is showing (on open, and
+  // when returning from an AI answer), since a content swap doesn't refocus.
+  useEffect(() => {
+    if (!open || ask !== null) return;
+    const frame = requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLInputElement>('[data-slot="command-input"]')
+        ?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open, ask]);
+
+  // Leave the AI answer, clearing the query so the search box is empty and
+  // focused again.
+  const backToSearch = () => {
+    setAsk(null);
+    setInput("");
+    setQuery("");
+  };
+
   const hasQuery = query.length > 0;
 
   const { data: results, isFetching: isSearching } = useQuery(
@@ -187,7 +207,7 @@ export const CommandPalette = () => {
       className="top-[8%] max-h-[84vh] overflow-hidden p-0 sm:max-w-2xl"
     >
       {ask !== null ? (
-        <AskAiView question={ask} onBack={() => setAsk(null)} />
+        <AskAiView question={ask} onBack={backToSearch} />
       ) : (
       <Command shouldFilter={false} loop className="rounded-none bg-transparent p-0">
         <CommandInput value={input} onValueChange={setInput} onKeyDown={handleTabNavigation} placeholder="Search everything or jump to…" />

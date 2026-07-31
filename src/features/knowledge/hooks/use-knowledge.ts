@@ -257,6 +257,7 @@ export const useCreateNode = () => {
         queryClient.invalidateQueries(trpc.knowledge.listChildren.queryFilter({ parentId: data.parentId }));
         queryClient.invalidateQueries(trpc.knowledge.listSpaces.queryFilter());
         queryClient.invalidateQueries(trpc.knowledge.listTree.queryFilter());
+        queryClient.invalidateQueries(trpc.dashboard.pathFilter());
       },
       onError: (error) => {
         toast.error(`Failed to create: ${error.message}`);
@@ -300,6 +301,7 @@ export const useUpdateNode = () => {
         queryClient.invalidateQueries(trpc.knowledge.listChildren.queryFilter({ parentId: data.parentId }));
         queryClient.invalidateQueries(trpc.knowledge.listSpaces.queryFilter());
         queryClient.invalidateQueries(trpc.knowledge.listTree.queryFilter());
+        queryClient.invalidateQueries(trpc.dashboard.pathFilter());
       },
     }),
   );
