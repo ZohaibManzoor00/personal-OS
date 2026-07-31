@@ -197,7 +197,7 @@ export const CommandPalette = () => {
       onOpenChange={setOpen}
       title="Command palette"
       description="Search, navigate, and create"
-      className="overflow-hidden p-0 sm:max-w-2xl"
+      className="top-[8%] max-h-[84vh] overflow-hidden p-0 sm:max-w-2xl"
     >
       <Command shouldFilter={false} loop className="rounded-none bg-transparent p-0">
         <CommandInput
