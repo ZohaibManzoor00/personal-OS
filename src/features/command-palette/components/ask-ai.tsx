@@ -20,6 +20,16 @@ const buildCitations = (sources: Source[]): CitationMap =>
     ]),
   );
 
+// Compact, human-readable label for each streamed phase. The palette is a tight
+// surface, so we keep these short (no counts) — the full timeline lives in the
+// dedicated chat view.
+const PHASE_LABEL: Record<string, string> = {
+  retrieving: "Searching your notes…",
+  retrieved: "Reading your notes…",
+  generating: "Drafting an answer…",
+  suggesting: "Wrapping up…",
+};
+
 /** The distinct `[n]` markers the answer actually referenced. */
 const usedCitationNumbers = (content: string, sourceCount: number) => {
   const used = new Set<number>();
@@ -44,6 +54,7 @@ export const AskAiView = ({
 }) => {
   const [content, setContent] = useState("");
   const [sources, setSources] = useState<Source[]>([]);
+  const [phase, setPhase] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -52,6 +63,7 @@ export const AskAiView = ({
     const controller = new AbortController();
     setContent("");
     setSources([]);
+    setPhase(null);
     setError(null);
     setIsStreaming(true);
 
@@ -63,7 +75,9 @@ export const AskAiView = ({
         );
 
         for await (const event of stream) {
-          if (event.type === "sources") {
+          if (event.type === "status") {
+            setPhase(event.phase);
+          } else if (event.type === "sources") {
             setSources(event.sources);
           } else if (event.type === "delta") {
             setContent((current) => current + event.text);
@@ -124,7 +138,10 @@ export const AskAiView = ({
         {error ? (
           <p className="text-sm text-destructive">{error}</p>
         ) : content === "" ? (
-          <TypingDots />
+          <div className="flex items-center gap-2">
+            <TypingDots />
+            {phase ? <span className="text-xs text-muted-foreground">{PHASE_LABEL[phase] ?? "Thinking…"}</span> : null}
+          </div>
         ) : (
           <>
             <KnowledgeMarkdown
@@ -160,7 +177,7 @@ export const AskAiView = ({
       </div>
 
       <div className="flex items-center justify-between gap-2 border-t px-3 py-2 text-[11px] text-muted-foreground">
-        <span>{isStreaming ? "Thinking…" : "Answered from your notes"}</span>
+        <span>{isStreaming ? ((phase ? PHASE_LABEL[phase] : null) ?? "Thinking…") : "Answered from your notes"}</span>
         <span>esc close</span>
       </div>
     </div>

@@ -89,6 +89,11 @@ export const chatRouter = createTRPCRouter({
     let answer: string | undefined;
 
     try {
+      // Announce each phase of the turn as it starts so the client can render a
+      // live "thinking" timeline instead of an opaque spinner. These are
+      // best-effort UI hints; the authoritative timings still land in `trace`.
+      yield { type: "status" as const, phase: "retrieving" as const };
+
       // Everything the vector search returned. Later steps (reranking, score
       // cutoffs) will narrow this down, so we keep the full set to trace how many
       // candidates we saw vs. how many actually made it into the prompt.
@@ -140,6 +145,16 @@ export const chatRouter = createTRPCRouter({
       ];
       const sourceNumberByNodeId = new Map(sources.map((source, index) => [source.id, index + 1]));
 
+      // Retrieval is done — tell the client how much grounding we found before
+      // generation begins, so the timeline can show real numbers.
+      yield {
+        type: "status" as const,
+        phase: "retrieved" as const,
+        chunkCount: chunks.length,
+        sourceCount: sources.length,
+        durationMs: retrievalDurationMs,
+      };
+
       const context = buildContextBlock(chunks, sourceNumberByNodeId);
       const system = buildChatSystemPrompt(context);
 
@@ -148,6 +163,9 @@ export const chatRouter = createTRPCRouter({
 
       try {
         const generationStart = performance.now();
+        // Switch from retrieval to generation. Surfaced before the first token
+        // (which can be a beat or two away) so the timeline keeps moving.
+        yield { type: "status" as const, phase: "generating" as const };
         // Open `streamText` inside the turn context so its generation span (with
         // model, token usage, and cost) nests under the chat-turn trace.
         const result = otelContext.with(turnContext, () =>
@@ -211,6 +229,7 @@ export const chatRouter = createTRPCRouter({
         // failure here shouldn't sink a turn whose answer already streamed fine,
         // so we swallow errors and simply skip the suggestions.
         try {
+          yield { type: "status" as const, phase: "suggesting" as const };
           const { object } = await otelContext.with(turnContext, () =>
             generateObject({
               model: openai(CHAT_MODEL),

@@ -4,10 +4,12 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
   BriefcaseIcon,
+  CheckIcon,
   ChevronDownIcon,
   CompassIcon,
   GaugeIcon,
   GraduationCapIcon,
+  Loader2Icon,
   type LucideIcon,
   PencilIcon,
   RefreshCwIcon,
@@ -59,6 +61,15 @@ type ChatTrace = {
   totalDurationMs: number;
 };
 
+// A phase of a single turn, streamed from chat.send as it happens so the UI can
+// show what the assistant is actually doing (searching notes, drafting, …)
+// instead of an opaque spinner. Mirrors the `status` events the server yields.
+type ChatStep =
+  | { phase: "retrieving" }
+  | { phase: "retrieved"; chunkCount: number; sourceCount: number; durationMs: number }
+  | { phase: "generating" }
+  | { phase: "suggesting" };
+
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
@@ -66,6 +77,7 @@ type ChatMessage = {
   sources?: ChatSource[];
   trace?: ChatTrace;
   followups?: string[];
+  steps?: ChatStep[];
 };
 
 // Starter prompts grouped by who's asking, so newcomers can pick the lane that
@@ -167,7 +179,14 @@ export const ChatPanel = () => {
       );
 
       for await (const event of stream) {
-        if (event.type === "sources") {
+        if (event.type === "status") {
+          // Append the phase to the running timeline. Storing the whole event is
+          // fine — the extra `type` field is ignored when we render by `phase`.
+          patchAssistant((message) => ({
+            ...message,
+            steps: [...(message.steps ?? []), event],
+          }));
+        } else if (event.type === "sources") {
           patchAssistant((message) => ({ ...message, sources: event.sources }));
         } else if (event.type === "delta") {
           patchAssistant((message) => ({
@@ -401,6 +420,7 @@ const ChatBubble = ({
   const isUser = message.role === "user";
   const followups = !isUser && showFollowups ? (message.followups ?? []) : [];
   const sources = message.sources ?? [];
+  const steps = message.steps ?? [];
   const citations = sources.length > 0 ? buildCitations(sources) : undefined;
   // Only show the notes the answer actually cited, keeping each source's
   // original 1-based number so the strip's chips still line up with the inline
@@ -475,11 +495,18 @@ const ChatBubble = ({
           {isUser ? (
             <p className="whitespace-pre-wrap">{message.content}</p>
           ) : message.content === "" ? (
-            // Waiting on the first streamed token — show the typing animation in
-            // place of the (still empty) answer.
-            <TypingDots />
+            // No answer yet: show the live timeline of what we're doing, falling
+            // back to the typing animation until the first status lands.
+            steps.length > 0 ? (
+              <ThinkingTimeline steps={steps} active />
+            ) : (
+              <TypingDots />
+            )
           ) : (
             <>
+              {/* The answer has started — collapse the timeline into a summary
+                  the reader can expand to see how the reply was built. */}
+              {steps.length > 0 && <ThinkingTimeline steps={steps} />}
               <KnowledgeMarkdown content={message.content} className="prose-sm" citations={citations} />
               {citedSources.length > 0 && <ChatSources sources={citedSources} />}
               {message.trace && <ChatTraceDetails trace={message.trace} />}
@@ -637,6 +664,77 @@ const ChatTraceDetails = ({ trace }: { trace: ChatTrace }) => {
             </div>
           )}
         </div>
+      )}
+    </div>
+  );
+};
+
+const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+
+// Human-readable label for a streamed phase. `retrieved` folds in the real
+// counts so the timeline reports what actually happened, not a canned string.
+const stepLabel = (step: ChatStep): string => {
+  switch (step.phase) {
+    case "retrieving":
+      return "Searching notes";
+    case "retrieved":
+      return step.sourceCount > 0
+        ? `Found ${plural(step.chunkCount, "passage")} across ${plural(step.sourceCount, "note")}`
+        : "No matching notes — answering from general knowledge";
+    case "generating":
+      return "Drafting an answer";
+    case "suggesting":
+      return "Suggesting follow-ups";
+  }
+};
+
+// The turn's phases as they stream in. While the answer is still pending
+// (`active`) it reads as a live checklist — the newest phase spins, the rest are
+// checked off. Once the answer starts it collapses to an expandable summary so
+// the "how I built this" trail stays available without crowding the reply.
+const ThinkingTimeline = ({ steps, active = false }: { steps: ChatStep[]; active?: boolean }) => {
+  const [open, setOpen] = useState(false);
+
+  if (active) {
+    return (
+      <ul className="flex flex-col gap-1.5 py-0.5">
+        {steps.map((step, index) => {
+          const isCurrent = index === steps.length - 1;
+          return (
+            <li key={step.phase} className="flex items-center gap-2 text-xs">
+              {isCurrent ? (
+                <Loader2Icon className="size-3.5 shrink-0 animate-spin text-primary" />
+              ) : (
+                <CheckIcon className="size-3.5 shrink-0 text-primary" />
+              )}
+              <span className={cn(isCurrent ? "text-foreground" : "text-muted-foreground")}>{stepLabel(step)}</span>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  return (
+    <div className="mb-3 border-b border-border/60 pb-2.5">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center gap-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <SparklesIcon className="size-3 shrink-0" />
+        Worked through {plural(steps.length, "step")}
+        <ChevronDownIcon className={cn("ml-auto size-3 shrink-0 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <ul className="mt-2 flex flex-col gap-1">
+          {steps.map((step) => (
+            <li key={step.phase} className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <CheckIcon className="size-3 shrink-0 text-primary/70" />
+              <span>{stepLabel(step)}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );

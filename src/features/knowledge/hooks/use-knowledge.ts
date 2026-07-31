@@ -176,6 +176,7 @@ export const useRecordView = (id: string) => {
     trpc.knowledge.recordView.mutationOptions({
       onSuccess: () => {
         queryClient.invalidateQueries(trpc.knowledge.listRecent.queryFilter());
+        queryClient.invalidateQueries(trpc.dashboard.pathFilter());
       },
     }),
   );
@@ -341,6 +342,7 @@ export const useDeleteNode = () => {
         queryClient.invalidateQueries(trpc.knowledge.listChildren.queryFilter());
         queryClient.invalidateQueries(trpc.knowledge.listSpaces.queryFilter());
         queryClient.invalidateQueries(trpc.knowledge.listTree.queryFilter());
+        queryClient.invalidateQueries(trpc.dashboard.pathFilter());
         if (data) queryClient.removeQueries(trpc.knowledge.get.queryFilter({ id: data.id }));
       },
     }),
@@ -357,6 +359,7 @@ export const useSetNodeLocked = () => {
         queryClient.invalidateQueries(trpc.knowledge.get.queryFilter({ id: data.id }));
         queryClient.invalidateQueries(trpc.knowledge.listChildren.queryFilter());
         queryClient.invalidateQueries(trpc.knowledge.listTree.queryFilter());
+        queryClient.invalidateQueries(trpc.dashboard.pathFilter());
       },
       onError: (error) => {
         toast.error(`Failed to update lock: ${error.message}`);
@@ -398,6 +401,7 @@ export const useNodeImage = (nodeId: string) => {
     queryClient.invalidateQueries(trpc.knowledge.listChildren.queryFilter());
     queryClient.invalidateQueries(trpc.knowledge.get.queryFilter({ id: nodeId }));
     queryClient.invalidateQueries(trpc.knowledge.search.queryFilter());
+    queryClient.invalidateQueries(trpc.dashboard.pathFilter());
   };
 
   const upload = async (file: File): Promise<boolean> => {
@@ -506,6 +510,7 @@ export const useMoveNode = () => {
         queryClient.invalidateQueries(trpc.knowledge.getAncestors.queryFilter({ id: data.id }));
         queryClient.invalidateQueries(trpc.knowledge.listSpaces.queryFilter());
         queryClient.invalidateQueries(trpc.knowledge.listTree.queryFilter());
+        queryClient.invalidateQueries(trpc.dashboard.pathFilter());
       },
       onError: (error) => {
         toast.error(`Failed to move: ${error.message}`);
