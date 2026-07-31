@@ -16,7 +16,8 @@ Clarity is the top priority — the diagram must read cleanly at a glance, not a
 - Keep it minimal: one node per distinct component, roughly 6–14 nodes. NEVER create duplicate nodes for the same thing (e.g. one "Client" node, not several) — reuse the same node id.
 - Lay it out as a clean, mostly linear flow. Order nodes so edges travel in one direction; avoid backward or long-distance edges, and don't connect everything to everything — show only the primary data-flow paths.
 - Give data stores, queues, and caches their own nodes in the line of flow.
-- Label only the edges that need it, with 1–3 words; leave the rest unlabeled. A readable 8-node diagram beats a complete 20-node mess.
+- Label EVERY arrow with the specific interaction or data crossing it — e.g. "request signed URL", "return upload URL", "object created", "deliver job", "transcode assets", "update status". These labels are the most useful part of the diagram, so always add them; an unlabeled arrow is a missed detail. Be concrete and precise but concise — roughly 2–5 words, never a full sentence.
+- A readable, fully-labeled 8-node diagram beats a complete 20-node mess.
 
 The output is rendered by mermaid-to-excalidraw, which only supports a subset of Mermaid. Stay strictly inside it:
 - Use only these types: flowchart, sequenceDiagram, classDiagram, or erDiagram. Prefer "flowchart TD" (or LR) for system/architecture designs.
@@ -26,5 +27,6 @@ The output is rendered by mermaid-to-excalidraw, which only supports a subset of
 Mermaid rules:
 - Start directly with the diagram-type keyword (e.g. "flowchart TD").
 - Use short alphanumeric node ids and put the human-readable text in labels.
-- Keep labels plain: avoid parentheses, brackets, and other special characters inside them; prefer single quotes over double quotes.
+- Write node and edge labels as plain text with NO surrounding quotes — e.g. A[Auth Service] and A -->|object created| B, never A['Auth Service'] or A -->|'object created'| B (the quotes would show up literally in the drawing).
+- Keep labels plain: avoid parentheses, brackets, colons, and other characters that need escaping inside them.
 - Do not wrap the output in triple backticks.`;

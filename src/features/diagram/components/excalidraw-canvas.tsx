@@ -44,7 +44,14 @@ export default function ExcalidrawCanvas({ mermaid }: { mermaid: string }) {
 
     const run = async () => {
       try {
-        // Fonts must be loaded before we measure text, or labels clip.
+        // Fonts must be loaded before we measure text, or labels clip (widths
+        // computed with a fallback font, drawn with the wider real one). An empty
+        // initial scene never requests Excalidraw's hand-drawn font, so force it
+        // to load explicitly before converting rather than just awaiting ready.
+        await Promise.allSettled([
+          document.fonts.load("16px Excalifont"),
+          document.fonts.load("20px Excalifont"),
+        ]);
         await document.fonts.ready;
         const elements = await build(mermaid).catch((error) => {
           if (mermaid.includes('"')) return build(mermaid.replaceAll('"', "'"));
