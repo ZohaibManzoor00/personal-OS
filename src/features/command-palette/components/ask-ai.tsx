@@ -177,7 +177,7 @@ export const AskAiView = ({
       </div>
 
       <div className="flex items-center justify-between gap-2 border-t px-3 py-2 text-[11px] text-muted-foreground">
-        <span>{isStreaming ? ((phase ? PHASE_LABEL[phase] : null) ?? "Thinking…") : "Answered from your notes"}</span>
+        <span>{isStreaming ? ((phase ? PHASE_LABEL[phase] : null) ?? "Thinking…") : ""}</span>
         <span>esc close</span>
       </div>
     </div>

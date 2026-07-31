@@ -119,6 +119,9 @@ export const ChatPanel = () => {
   const [input, setInput] = useState("");
   const [atBottom, setAtBottom] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
+  // The phase of the in-flight turn, surfaced live above the composer so the
+  // user watches it move (Retrieving → Retrieved N chunks → Generating).
+  const [currentStep, setCurrentStep] = useState<ChatStep | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // Lets the user cut a streaming answer short. Held in a ref so the Stop button
@@ -165,6 +168,7 @@ export const ChatPanel = () => {
     // Starting a turn is an explicit intent to be at the latest message.
     setAtBottom(true);
     setIsStreaming(true);
+    setCurrentStep(null);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -180,8 +184,9 @@ export const ChatPanel = () => {
 
       for await (const event of stream) {
         if (event.type === "status") {
-          // Append the phase to the running timeline. Storing the whole event is
-          // fine — the extra `type` field is ignored when we render by `phase`.
+          // Drive the live status line above the composer, and keep the running
+          // list on the message so it can collapse into a summary afterwards.
+          setCurrentStep(event);
           patchAssistant((message) => ({
             ...message,
             steps: [...(message.steps ?? []), event],
@@ -212,6 +217,7 @@ export const ChatPanel = () => {
       }
     } finally {
       setIsStreaming(false);
+      setCurrentStep(null);
       abortRef.current = null;
     }
   };
@@ -342,6 +348,7 @@ export const ChatPanel = () => {
           </Button>
         )}
         <div className="mx-auto w-full max-w-4xl px-2 sm:px-4">
+          {isStreaming && currentStep ? <StreamingStatus step={currentStep} /> : null}
           <div className="relative flex items-end gap-2 rounded-2xl border border-input bg-card p-2 shadow-xs focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
             <Textarea
               ref={inputRef}
@@ -495,17 +502,13 @@ const ChatBubble = ({
           {isUser ? (
             <p className="whitespace-pre-wrap">{message.content}</p>
           ) : message.content === "" ? (
-            // No answer yet: show the live timeline of what we're doing, falling
-            // back to the typing animation until the first status lands.
-            steps.length > 0 ? (
-              <ThinkingTimeline steps={steps} active />
-            ) : (
-              <TypingDots />
-            )
+            // Waiting on the first streamed token. The live phase is shown above
+            // the composer, so the bubble just needs the typing animation.
+            <TypingDots />
           ) : (
             <>
-              {/* The answer has started — collapse the timeline into a summary
-                  the reader can expand to see how the reply was built. */}
+              {/* The phase timeline collapses into an expandable summary once the
+                  answer starts, so the reader can see how the reply was built. */}
               {steps.length > 0 && <ThinkingTimeline steps={steps} />}
               <KnowledgeMarkdown content={message.content} className="prose-sm" citations={citations} />
               {citedSources.length > 0 && <ChatSources sources={citedSources} />}
@@ -688,32 +691,40 @@ const stepLabel = (step: ChatStep): string => {
   }
 };
 
-// The turn's phases as they stream in. While the answer is still pending
-// (`active`) it reads as a live checklist — the newest phase spins, the rest are
-// checked off. Once the answer starts it collapses to an expandable summary so
-// the "how I built this" trail stays available without crowding the reply.
-const ThinkingTimeline = ({ steps, active = false }: { steps: ChatStep[]; active?: boolean }) => {
-  const [open, setOpen] = useState(false);
-
-  if (active) {
-    return (
-      <ul className="flex flex-col gap-1.5 py-0.5">
-        {steps.map((step, index) => {
-          const isCurrent = index === steps.length - 1;
-          return (
-            <li key={step.phase} className="flex items-center gap-2 text-xs">
-              {isCurrent ? (
-                <Loader2Icon className="size-3.5 shrink-0 animate-spin text-primary" />
-              ) : (
-                <CheckIcon className="size-3.5 shrink-0 text-primary" />
-              )}
-              <span className={cn(isCurrent ? "text-foreground" : "text-muted-foreground")}>{stepLabel(step)}</span>
-            </li>
-          );
-        })}
-      </ul>
-    );
+// Short label for the live status line above the composer. Phrased as the
+// action in progress (Retrieving…, Generating…), with the real chunk count
+// folded in once retrieval finishes.
+const streamingLabel = (step: ChatStep): string => {
+  switch (step.phase) {
+    case "retrieving":
+      return "Retrieving";
+    case "retrieved":
+      return step.chunkCount > 0 ? `Retrieved ${plural(step.chunkCount, "chunk")}` : "No matching notes";
+    case "generating":
+      return "Generating";
+    case "suggesting":
+      return "Suggesting follow-ups";
   }
+};
+
+// The evolving one-liner shown above the composer while a turn streams: a
+// spinner, the current phase, and an animated ellipsis so it reads as live.
+const StreamingStatus = ({ step }: { step: ChatStep }) => (
+  <div className="mb-2 flex items-center gap-2 px-1 text-xs font-medium text-muted-foreground">
+    <Loader2Icon className="size-3.5 shrink-0 animate-spin text-primary" />
+    <span>{streamingLabel(step)}</span>
+    <span className="inline-flex items-end gap-0.5 pb-0.5">
+      {[0, 200, 400].map((delay) => (
+        <span key={delay} className="size-1 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: `${delay}ms` }} />
+      ))}
+    </span>
+  </div>
+);
+
+// Once the answer starts, the phases collapse into an expandable summary so the
+// "how I built this" trail stays available without crowding the reply.
+const ThinkingTimeline = ({ steps }: { steps: ChatStep[] }) => {
+  const [open, setOpen] = useState(false);
 
   return (
     <div className="mb-3 border-b border-border/60 pb-2.5">
