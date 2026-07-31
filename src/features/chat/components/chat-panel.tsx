@@ -406,9 +406,7 @@ const ChatBubble = ({
   // original 1-based number so the strip's chips still line up with the inline
   // `[n]` markers even when earlier sources went uncited.
   const used = sources.length > 0 ? usedCitationNumbers(message.content, sources.length) : undefined;
-  const citedSources = used
-    ? sources.map((source, index) => ({ source, number: index + 1 })).filter(({ number }) => used.has(number))
-    : [];
+  const citedSources = used ? sources.map((source, index) => ({ source, number: index + 1 })).filter(({ number }) => used.has(number)) : [];
 
   // Local edit state for user messages: entering edit mode swaps the bubble for
   // a textarea seeded with the current text.

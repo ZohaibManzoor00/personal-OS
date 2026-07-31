@@ -20,7 +20,6 @@ import { type ReactNode, useEffect, useState } from "react";
 import {
   Command,
   CommandDialog,
-  CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
@@ -29,10 +28,7 @@ import {
 } from "@/components/ui/command";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useIsOwner } from "@/features/auth/hooks/use-is-owner";
-import {
-  Highlighted,
-  ResultBreadcrumbTitle,
-} from "@/features/knowledge/components/knowledge-highlight";
+import { Highlighted, ResultBreadcrumbTitle } from "@/features/knowledge/components/knowledge-highlight";
 import { useCreateNode } from "@/features/knowledge/hooks/use-knowledge";
 import { groupSearchResultsBySection } from "@/features/knowledge/lib/group-results";
 import { buildNodeHref } from "@/features/knowledge/lib/search-navigation";
@@ -45,6 +41,7 @@ import {
 } from "@/features/knowledge/lib/sections";
 import { useTRPC } from "@/trpc/client";
 import { useCommandPalette, useCommandPaletteHotkey } from "../use-command-palette";
+import { AskAiView } from "./ask-ai";
 
 type NavItem = { label: string; href: string; icon: typeof HomeIcon };
 
@@ -120,6 +117,9 @@ export const CommandPalette = () => {
 
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
+  // When set, the palette shows the streaming AI answer for this question
+  // instead of the search list.
+  const [ask, setAsk] = useState<string | null>(null);
 
   // Debounce typing before hitting the search endpoint.
   useEffect(() => {
@@ -132,24 +132,17 @@ export const CommandPalette = () => {
     if (!open) {
       setInput("");
       setQuery("");
+      setAsk(null);
     }
   }, [open]);
 
   const hasQuery = query.length > 0;
 
   const { data: results, isFetching: isSearching } = useQuery(
-    trpc.knowledge.search.queryOptions(
-      { query, ...(currentSection ? { section: currentSection } : {}) },
-      { enabled: open && hasQuery },
-    ),
+    trpc.knowledge.search.queryOptions({ query, ...(currentSection ? { section: currentSection } : {}) }, { enabled: open && hasQuery }),
   );
 
-  const { data: recents } = useQuery(
-    trpc.dashboard.recentAll.queryOptions(
-      { limit: 8 },
-      { enabled: open && !hasQuery },
-    ),
-  );
+  const { data: recents } = useQuery(trpc.dashboard.recentAll.queryOptions({ limit: 8 }, { enabled: open && !hasQuery }));
 
   const run = (action: () => void) => {
     setOpen(false);
@@ -157,9 +150,7 @@ export const CommandPalette = () => {
   };
 
   const goToNode = (section: string, id: string, type: "SPACE" | "PAGE") =>
-    run(() =>
-      router.push(buildNodeHref(section, id, type === "PAGE" ? query : undefined)),
-    );
+    run(() => router.push(buildNodeHref(section, id, type === "PAGE" ? query : undefined)));
 
   const quickCreate = (type: "SPACE" | "PAGE") => {
     const section: KnowledgeSection = currentSection ?? "learnings";
@@ -170,9 +161,7 @@ export const CommandPalette = () => {
         {
           onSuccess: (node) => {
             const base = getKnowledgeSectionConfig(section).basePath;
-            router.push(
-              node.type === "PAGE" ? `${base}/${node.id}?edit=1` : `${base}/${node.id}`,
-            );
+            router.push(node.type === "PAGE" ? `${base}/${node.id}?edit=1` : `${base}/${node.id}`);
           },
         },
       ),
@@ -187,9 +176,7 @@ export const CommandPalette = () => {
     return item.label.toLowerCase().includes(query.toLowerCase());
   });
 
-  const groups = results
-    ? groupSearchResultsBySection(results, currentSection ?? "")
-    : [];
+  const groups = results ? groupSearchResultsBySection(results, currentSection ?? "") : [];
 
   return (
     <CommandDialog
@@ -199,18 +186,12 @@ export const CommandPalette = () => {
       description="Search, navigate, and create"
       className="top-[8%] max-h-[84vh] overflow-hidden p-0 sm:max-w-2xl"
     >
+      {ask !== null ? (
+        <AskAiView question={ask} onBack={() => setAsk(null)} />
+      ) : (
       <Command shouldFilter={false} loop className="rounded-none bg-transparent p-0">
-        <CommandInput
-          value={input}
-          onValueChange={setInput}
-          onKeyDown={handleTabNavigation}
-          placeholder="Search everything or jump to…"
-        />
+        <CommandInput value={input} onValueChange={setInput} onKeyDown={handleTabNavigation} placeholder="Search everything or jump to…" />
         <CommandList className="mt-1 max-h-[60vh] border-t p-1.5">
-          {hasQuery && !isSearching && groups.length === 0 && navItems.length === 0 ? (
-            <CommandEmpty>No results for "{query}"</CommandEmpty>
-          ) : null}
-
           {hasQuery && isSearching && !results ? (
             <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
               <Loader2Icon className="size-4 animate-spin" />
@@ -252,10 +233,7 @@ export const CommandPalette = () => {
                       >
                         <ItemIcon icon={Icon} />
                         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <ResultBreadcrumbTitle
-                            breadcrumb={node.breadcrumb}
-                            titleHighlight={node.titleHighlight}
-                          />
+                          <ResultBreadcrumbTitle breadcrumb={node.breadcrumb} titleHighlight={node.titleHighlight} />
                           {node.snippet ? (
                             <p className="line-clamp-1 text-xs text-muted-foreground">
                               <Highlighted value={node.snippet} />
@@ -269,30 +247,38 @@ export const CommandPalette = () => {
               ))
             : null}
 
+          {hasQuery ? (
+            <>
+              <CommandSeparator />
+              <CommandGroup heading="Ask">
+                <CommandItem
+                  value="ask-ai"
+                  onSelect={() => setAsk(query)}
+                  className="gap-3 rounded-lg px-2 py-2"
+                >
+                  <ItemIcon icon={SparklesIcon} />
+                  <span className="min-w-0 flex-1 truncate">
+                    Ask AI: "{query}"
+                  </span>
+                </CommandItem>
+              </CommandGroup>
+            </>
+          ) : null}
+
           {isOwner ? (
             <>
               <CommandSeparator />
               <CommandGroup heading={hasQuery ? "Create" : "Quick actions"}>
-                <CommandItem
-                  value="create-page"
-                  onSelect={() => quickCreate("PAGE")}
-                  className="gap-3 rounded-lg px-2 py-2"
-                >
+                <CommandItem value="create-page" onSelect={() => quickCreate("PAGE")} className="gap-3 rounded-lg px-2 py-2">
                   <ItemIcon icon={FilePlusIcon} />
                   <span>
                     {hasQuery ? `Create page "${query}"` : "New page"}
                     {!hasQuery && currentSection ? (
-                      <span className="ml-1 text-xs text-muted-foreground">
-                        in {resolveSectionLabel(currentSection)}
-                      </span>
+                      <span className="ml-1 text-xs text-muted-foreground">in {resolveSectionLabel(currentSection)}</span>
                     ) : null}
                   </span>
                 </CommandItem>
-                <CommandItem
-                  value="create-space"
-                  onSelect={() => quickCreate("SPACE")}
-                  className="gap-3 rounded-lg px-2 py-2"
-                >
+                <CommandItem value="create-space" onSelect={() => quickCreate("SPACE")} className="gap-3 rounded-lg px-2 py-2">
                   <ItemIcon icon={FolderPlusIcon} />
                   <span>{hasQuery ? `Create space "${query}"` : "New space"}</span>
                 </CommandItem>
@@ -315,18 +301,12 @@ export const CommandPalette = () => {
                     >
                       <ItemIcon icon={item.icon} />
                       <span className="flex-1">{item.label}</span>
-                      {active ? (
-                        <span className="text-xs text-muted-foreground">current</span>
-                      ) : null}
+                      {active ? <span className="text-xs text-muted-foreground">current</span> : null}
                     </CommandItem>
                   );
                 })}
                 {!hasQuery || "toggle sidebar".includes(query.toLowerCase()) ? (
-                  <CommandItem
-                    value="toggle-sidebar"
-                    onSelect={() => run(toggleSidebar)}
-                    className="gap-3 rounded-lg px-2 py-2"
-                  >
+                  <CommandItem value="toggle-sidebar" onSelect={() => run(toggleSidebar)} className="gap-3 rounded-lg px-2 py-2">
                     <ItemIcon icon={PanelLeftIcon} />
                     <span>Toggle sidebar</span>
                   </CommandItem>
@@ -356,6 +336,7 @@ export const CommandPalette = () => {
           </span>
         </div>
       </Command>
+      )}
     </CommandDialog>
   );
 };
