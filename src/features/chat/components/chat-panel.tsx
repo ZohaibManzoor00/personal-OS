@@ -24,6 +24,10 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { getSectionIcon } from "@/features/dashboard/lib/section-meta";
+import {
+  type ChatDiagram,
+  DiagramPreview,
+} from "@/features/diagram/components/diagram-preview";
 import type { CitationMap } from "@/features/knowledge/components/knowledge-markdown";
 import { KnowledgeMarkdown } from "@/features/knowledge/components/knowledge-markdown";
 import { buildNodeHref } from "@/features/knowledge/lib/search-navigation";
@@ -89,6 +93,7 @@ type ChatMessage = {
   trace?: ChatTrace;
   followups?: string[];
   steps?: ChatStep[];
+  diagrams?: ChatDiagram[];
 };
 
 // Starter prompts grouped by who's asking, so newcomers can pick the lane that
@@ -225,6 +230,25 @@ export const ChatPanel = () => {
           }));
         } else if (event.type === "sources") {
           patchAssistant((message) => ({ ...message, sources: event.sources }));
+        } else if (event.type === "diagram") {
+          // Upsert the diagram by id as it transitions generating → done/empty.
+          patchAssistant((message) => {
+            const next: ChatDiagram = {
+              id: event.id,
+              status: event.status,
+              mermaid: event.mermaid,
+            };
+            const existing = message.diagrams ?? [];
+            const found = existing.some((diagram) => diagram.id === event.id);
+            return {
+              ...message,
+              diagrams: found
+                ? existing.map((diagram) =>
+                    diagram.id === event.id ? next : diagram,
+                  )
+                : [...existing, next],
+            };
+          });
         } else if (event.type === "delta") {
           patchAssistant((message) => ({
             ...message,
@@ -546,6 +570,16 @@ const usedCitationNumbers = (
   return used;
 };
 
+// Diagrams render as interactive Excalidraw (from the concurrent diagram agent),
+// so any Mermaid the prose model writes anyway is dropped before display —
+// including an unterminated fence still streaming in. Notes rendering is
+// untouched; this only applies to chat answers.
+const stripMermaidBlocks = (content: string): string =>
+  content
+    .replace(/```mermaid[\s\S]*?```/gi, "")
+    .replace(/```mermaid[\s\S]*$/i, "")
+    .trimEnd();
+
 const ChatBubble = ({
   message,
   showFollowups,
@@ -569,6 +603,15 @@ const ChatBubble = ({
   const followups = !isUser && showFollowups ? (message.followups ?? []) : [];
   const sources = message.sources ?? [];
   const steps = message.steps ?? [];
+  const diagrams = isUser
+    ? []
+    : (message.diagrams ?? []).filter((diagram) => diagram.status !== "empty");
+  // Diagrams are rendered as interactive Excalidraw from the diagram agent, so
+  // any Mermaid the prose model emits is stripped — the reader only sees the
+  // rendered diagram, never raw Mermaid source.
+  const displayContent = isUser
+    ? message.content
+    : stripMermaidBlocks(message.content);
   const citations = sources.length > 0 ? buildCitations(sources) : undefined;
   // Only show the notes the answer actually cited, keeping each source's
   // original 1-based number so the strip's chips still line up with the inline
@@ -668,24 +711,40 @@ const ChatBubble = ({
         >
           {isUser ? (
             <p className="whitespace-pre-wrap">{message.content}</p>
-          ) : message.content === "" ? (
-            // Waiting on the first streamed token. The live phase is shown above
-            // the composer, so the bubble just needs the typing animation.
-            <TypingDots />
           ) : (
             <>
               {/* The phase timeline collapses into an expandable summary once the
                   answer starts, so the reader can see how the reply was built. */}
-              {steps.length > 0 && <ThinkingTimeline steps={steps} />}
-              <KnowledgeMarkdown
-                content={message.content}
-                className="prose-sm"
-                citations={citations}
-              />
-              {citedSources.length > 0 && (
+              {displayContent !== "" && steps.length > 0 && (
+                <ThinkingTimeline steps={steps} />
+              )}
+              {displayContent === "" ? (
+                // Waiting on the first streamed token. The live phase is shown
+                // above the composer, so the bubble just needs the animation —
+                // unless a diagram is already forming below.
+                diagrams.length === 0 && <TypingDots />
+              ) : (
+                <KnowledgeMarkdown
+                  content={displayContent}
+                  className="prose-sm"
+                  citations={citations}
+                />
+              )}
+              {/* Diagrams stream in from the concurrent diagram agent, so they can
+                  appear while the prose is still landing. */}
+              {diagrams.length > 0 && (
+                <div className="mt-3 flex flex-col gap-3">
+                  {diagrams.map((diagram) => (
+                    <DiagramPreview key={diagram.id} diagram={diagram} />
+                  ))}
+                </div>
+              )}
+              {displayContent !== "" && citedSources.length > 0 && (
                 <ChatSources sources={citedSources} />
               )}
-              {message.trace && <ChatTraceDetails trace={message.trace} />}
+              {displayContent !== "" && message.trace && (
+                <ChatTraceDetails trace={message.trace} />
+              )}
             </>
           )}
         </div>
@@ -969,7 +1028,11 @@ const ThinkingTimeline = ({ steps }: { steps: ChatStep[] }) => {
               {step.phase === "tool-result" && step.sources.length > 0 && (
                 <div className="ml-5 flex flex-wrap gap-1">
                   {/* One note can surface via several chunks, so collapse to distinct notes. */}
-                  {[...new Map(step.sources.map((source) => [source.id, source])).values()].map((source) => {
+                  {[
+                    ...new Map(
+                      step.sources.map((source) => [source.id, source]),
+                    ).values(),
+                  ].map((source) => {
                     const Icon = getSectionIcon(source.section);
                     return (
                       <span

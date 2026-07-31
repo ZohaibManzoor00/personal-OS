@@ -6,6 +6,7 @@ import { generateObject, generateText, stepCountIs, streamText } from "ai";
 import { after } from "next/server";
 import z from "zod";
 import { langfuseSpanProcessor } from "@/instrumentation.node";
+import { DIAGRAM_SYSTEM_PROMPT } from "@/prompts/chat-diagram";
 import { FOLLOWUP_SYSTEM_PROMPT } from "@/prompts/chat-followups";
 import { SUMMARY_SYSTEM_PROMPT } from "@/prompts/chat-summary";
 import { buildAgentSystemPrompt } from "@/prompts/chat-system";
@@ -98,6 +99,61 @@ const summarizeToolResult = (
   return { count: 0, sources: [] };
 };
 
+/**
+ * Merges two async iterables into one, tagging each value with its source and
+ * yielding whichever arrives first. Lets a single generator stream the prose
+ * agent and the concurrent diagram agent together, interleaved as they produce.
+ */
+async function* mergeStreams<A, B>(
+  a: AsyncIterable<A>,
+  b: AsyncIterable<B>,
+): AsyncGenerator<{ source: "a"; value: A } | { source: "b"; value: B }> {
+  const ia = a[Symbol.asyncIterator]();
+  const ib = b[Symbol.asyncIterator]();
+  type Next =
+    | { k: "a"; r: IteratorResult<A> }
+    | { k: "b"; r: IteratorResult<B> };
+  let pa: Promise<Next> | null = ia.next().then((r) => ({ k: "a", r }));
+  let pb: Promise<Next> | null = ib.next().then((r) => ({ k: "b", r }));
+
+  while (pa || pb) {
+    const winner = await Promise.race(
+      [pa, pb].filter((p): p is Promise<Next> => p !== null),
+    );
+    if (winner.k === "a") {
+      if (winner.r.done) pa = null;
+      else {
+        yield { source: "a", value: winner.r.value };
+        pa = ia.next().then((r) => ({ k: "a", r }));
+      }
+    } else {
+      if (winner.r.done) pb = null;
+      else {
+        yield { source: "b", value: winner.r.value };
+        pb = ib.next().then((r) => ({ k: "b", r }));
+      }
+    }
+  }
+}
+
+// Mermaid diagram-type keywords, used to tell a real diagram from stray text.
+const MERMAID_KEYWORDS =
+  /^(flowchart|graph|sequenceDiagram|classDiagram|stateDiagram(-v2)?|erDiagram|journey|gantt|pie|mindmap|timeline|quadrantChart|gitGraph|C4Context|requirementDiagram)\b/;
+
+/**
+ * Pulls clean Mermaid out of the diagram agent's raw output — stripping any code
+ * fences it added — or returns null when there's no real diagram (the agent
+ * declines by emitting nothing, but this also guards against stray prose).
+ */
+const extractMermaid = (raw: string): string | null => {
+  let text = raw.trim();
+  if (!text) return null;
+  const fenced = text.match(/```(?:mermaid)?\s*([\s\S]*?)```/i);
+  if (fenced) text = fenced[1].trim();
+  if (!text || !MERMAID_KEYWORDS.test(text)) return null;
+  return text;
+};
+
 export const chatRouter = createTRPCRouter({
   /**
    * A single streaming turn as a tool-calling agent. Public — anyone (signed in
@@ -179,15 +235,59 @@ export const chatRouter = createTRPCRouter({
           }),
         );
 
+        // Second agent, kicked off concurrently: it decides whether a diagram
+        // helps and, if so, streams back Mermaid. Runs in parallel with the prose
+        // answer so the diagram forms while the words are still streaming. Errors
+        // here are non-fatal — the answer stands on its own without a diagram.
+        const diagramResult = otelContext.with(turnContext, () =>
+          streamText({
+            model: openai(CHAT_MODEL),
+            system: DIAGRAM_SYSTEM_PROMPT,
+            messages: input.messages,
+            maxOutputTokens: 1024,
+            timeout: { totalMs: 45_000 },
+            onError: ({ error }) =>
+              console.error("chat.send diagram agent error", error),
+            experimental_telemetry: {
+              isEnabled: true,
+              functionId: "diagram-agent",
+            },
+          }),
+        );
+        const diagramId = crypto.randomUUID();
+        let diagramText = "";
+        let diagramStarted = false;
+
         // Time-to-first-token: when the model started producing the *answer* text,
         // as distinct from tool-calling. Null if nothing streamed.
         let firstTokenAt: number | null = null;
         let generatingEmitted = false;
         let toolCallCount = 0;
 
-        // fullStream carries tool calls/results interleaved with text, so we can
-        // narrate the agent's work step by step instead of just streaming tokens.
-        for await (const part of result.fullStream) {
+        // Merge the prose agent's fullStream (tool calls/results + text) with the
+        // diagram agent's text, so both stream through this one generator. Prose
+        // parts drive the answer + timeline; diagram text accumulates into a
+        // Mermaid string the client renders as an interactive scene.
+        for await (const item of mergeStreams(
+          result.fullStream,
+          diagramResult.textStream,
+        )) {
+          if (item.source === "b") {
+            diagramText += item.value;
+            // Announce the diagram as soon as the agent commits to one, so the UI
+            // can show a placeholder while it (and the prose) finish.
+            if (!diagramStarted && diagramText.trim().length > 0) {
+              diagramStarted = true;
+              yield {
+                type: "diagram" as const,
+                id: diagramId,
+                status: "generating" as const,
+              };
+            }
+            continue;
+          }
+
+          const part = item.value;
           if (part.type === "tool-call") {
             toolCallCount += 1;
             yield {
@@ -220,6 +320,25 @@ export const chatRouter = createTRPCRouter({
             firstTokenAt ??= performance.now();
             yield { type: "delta" as const, text: part.text };
           }
+        }
+
+        // Finalize the diagram: hand over the parsed Mermaid, or mark it empty so
+        // the client can drop the placeholder if the agent's output wasn't a real
+        // diagram. Skipped entirely when the agent declined (produced nothing).
+        if (diagramStarted) {
+          const mermaid = extractMermaid(diagramText);
+          yield mermaid
+            ? {
+                type: "diagram" as const,
+                id: diagramId,
+                status: "done" as const,
+                mermaid,
+              }
+            : {
+                type: "diagram" as const,
+                id: diagramId,
+                status: "empty" as const,
+              };
         }
 
         // Resolve once the stream above has fully drained.
