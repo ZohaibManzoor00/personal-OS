@@ -17,6 +17,13 @@ const CHAT_MAX_CHARS = 8_000;
 // How many note chunks to pull into context for each turn.
 const RETRIEVAL_LIMIT = 8;
 
+// Cosine score a chunk must clear for the turn to count as "grounded" in Zo's
+// notes. This sits above searchChunks' candidate floor (minScore): weaker
+// matches are still shown to the model, but only a strong one flips the prompt
+// into "answer from the notes and cite" mode instead of "these may be
+// irrelevant, don't attribute anything to Zo unless it truly fits".
+const STRONG_MATCH_SCORE = 0.45;
+
 // How many follow-up questions to suggest after each answer.
 const FOLLOWUP_COUNT = 3;
 
@@ -155,8 +162,14 @@ export const chatRouter = createTRPCRouter({
         durationMs: retrievalDurationMs,
       };
 
+      // Grounded when at least one retrieved chunk is a strong match. Weaker
+      // matches still reach the prompt, but this flag tells the model how much
+      // to trust them so it doesn't force an answer about Zo out of loosely
+      // related notes.
+      const grounded = chunks.some((chunk) => chunk.score >= STRONG_MATCH_SCORE);
+
       const context = buildContextBlock(chunks, sourceNumberByNodeId);
-      const system = buildChatSystemPrompt(context);
+      const system = buildChatSystemPrompt(context, grounded);
 
       // Emit sources first so the UI can render citations before the answer lands.
       yield { type: "sources" as const, sources };
