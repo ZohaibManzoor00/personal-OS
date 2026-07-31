@@ -235,11 +235,16 @@ export const searchChunks = async ({
   query,
   isOwner,
   limit = 8,
-  // Cosine-similarity floor a chunk must clear to be a candidate. Tuned for
-  // text-embedding-3-small, whose genuinely-relevant matches sit around 0.3+
-  // while loosely-related notes trail below — a lower floor (e.g. 0.15) let
-  // almost every note through and padded answers with off-topic sources.
-  minScore = 0.3,
+  // Cosine-similarity floor a chunk must clear to be a candidate. text-embedding-
+  // 3-small produces low absolute scores on this corpus: genuinely-relevant hits
+  // land ~0.33–0.48, and broad/overview questions ("what topics does Zo cover?")
+  // dip to ~0.22–0.33. A 0.3 floor silently dropped those broad queries to an
+  // empty result — and, with the grounded-prompt tiers, a hard "nothing in the
+  // notes" — so we sit at 0.22 to keep enough recall for synthesis. Truly
+  // off-topic queries ("what color is the moon") fall well below this and still
+  // return nothing. The prompt's weak/grounded tiers (see STRONG_MATCH_SCORE in
+  // the chat router) then decide how much to trust whatever clears the floor.
+  minScore = 0.22,
   poolLimit = 40,
   minDistinctNodes = 4,
 }: {

@@ -30,6 +30,11 @@ import { buildNodeHref } from "@/features/knowledge/lib/search-navigation";
 import { cn } from "@/lib/utils";
 import { getStreamingTRPCClient } from "@/trpc/client";
 
+// The transcript cap the chat.send / chat.summarize input schemas enforce on the
+// server. We gate sends one turn early on the client so a normal message never
+// trips that validation error — instead the user gets the limit card.
+const MAX_MESSAGES = 50;
+
 type ChatSource = {
   id: string;
   title: string;
@@ -52,21 +57,27 @@ type ChatTrace = {
   totalTokens?: number;
   finishReason: string;
   warnings?: ChatWarning[];
-  retrievedChunkCount: number;
-  includedChunkCount: number;
+  toolCallCount: number;
   sourceCount: number;
-  retrievalDurationMs: number;
   timeToFirstTokenMs: number | null;
   generationDurationMs: number;
   totalDurationMs: number;
 };
 
 // A phase of a single turn, streamed from chat.send as it happens so the UI can
-// show what the assistant is actually doing (searching notes, drafting, …)
-// instead of an opaque spinner. Mirrors the `status` events the server yields.
+// show what the agent is actually doing (thinking, calling a tool and what it
+// found, drafting, …) instead of an opaque spinner. Mirrors the `status` events
+// the server yields, minus the `type` discriminator.
 type ChatStep =
-  | { phase: "retrieving" }
-  | { phase: "retrieved"; chunkCount: number; sourceCount: number; durationMs: number }
+  | { phase: "thinking" }
+  | { phase: "tool-call"; toolCallId: string; tool: string; label: string }
+  | {
+      phase: "tool-result";
+      toolCallId: string;
+      tool: string;
+      resultCount: number;
+      sources: ChatSource[];
+    }
   | { phase: "generating" }
   | { phase: "suggesting" };
 
@@ -92,25 +103,37 @@ const SUGGESTION_GROUPS: Array<{
     persona: "Recruiter",
     tagline: "Sizing up Zo's work?",
     icon: BriefcaseIcon,
-    prompts: ["What has Zo shipped recently?", "What are Zo's strengths as an engineer?"],
+    prompts: [
+      "What has Zo shipped recently?",
+      "What are Zo's strengths as an engineer?",
+    ],
   },
   {
     persona: "Student",
     tagline: "Here to learn?",
     icon: GraduationCapIcon,
-    prompts: ["Quiz me on something from these notes", "Explain a concept Zo's been studying"],
+    prompts: [
+      "Quiz me on something from these notes",
+      "Explain a concept Zo's been studying",
+    ],
   },
   {
     persona: "Collaborator",
     tagline: "Working with Zo?",
     icon: UsersIcon,
-    prompts: ["What projects are in flight right now?", "Draft a standup update from recent work"],
+    prompts: [
+      "What projects are in flight right now?",
+      "Draft a standup update from recent work",
+    ],
   },
   {
     persona: "Just curious",
     tagline: "Poking around?",
     icon: CompassIcon,
-    prompts: ["Summarize what Zo's been learning lately", "Surprise me with something interesting"],
+    prompts: [
+      "Summarize what Zo's been learning lately",
+      "Surprise me with something interesting",
+    ],
   },
 ];
 
@@ -119,6 +142,8 @@ export const ChatPanel = () => {
   const [input, setInput] = useState("");
   const [atBottom, setAtBottom] = useState(true);
   const [isStreaming, setIsStreaming] = useState(false);
+  // Set while the "summarize & continue" recap is being generated.
+  const [isSummarizing, setIsSummarizing] = useState(false);
   // The phase of the in-flight turn, surfaced live above the composer so the
   // user watches it move (Retrieving → Retrieved N chunks → Generating).
   const [currentStep, setCurrentStep] = useState<ChatStep | null>(null);
@@ -164,7 +189,10 @@ export const ChatPanel = () => {
     // An empty assistant bubble we fill in as tokens stream. Tracking its id
     // lets us patch just this message on each event without touching the rest.
     const assistantId = crypto.randomUUID();
-    setMessages([...history, { id: assistantId, role: "assistant", content: "" }]);
+    setMessages([
+      ...history,
+      { id: assistantId, role: "assistant", content: "" },
+    ]);
     // Starting a turn is an explicit intent to be at the latest message.
     setAtBottom(true);
     setIsStreaming(true);
@@ -174,7 +202,11 @@ export const ChatPanel = () => {
     abortRef.current = controller;
 
     const patchAssistant = (patch: (message: ChatMessage) => ChatMessage) =>
-      setMessages((current) => current.map((message) => (message.id === assistantId ? patch(message) : message)));
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === assistantId ? patch(message) : message,
+        ),
+      );
 
     try {
       const stream = await getStreamingTRPCClient().chat.send.mutate(
@@ -211,9 +243,17 @@ export const ChatPanel = () => {
       // Drop the assistant bubble if nothing streamed in; keep any partial text
       // so the user still sees what arrived before the failure (or before they
       // hit Stop). A user-initiated abort isn't an error worth toasting.
-      setMessages((current) => current.filter((message) => message.id !== assistantId || message.content.length > 0));
+      setMessages((current) =>
+        current.filter(
+          (message) => message.id !== assistantId || message.content.length > 0,
+        ),
+      );
       if (!controller.signal.aborted) {
-        toast.error(error instanceof Error ? error.message : "Could not reach the assistant. Please try again.");
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Could not reach the assistant. Please try again.",
+        );
       }
     } finally {
       setIsStreaming(false);
@@ -224,9 +264,56 @@ export const ChatPanel = () => {
 
   const send = (raw: string) => {
     const content = raw.trim();
-    if (!content || isStreaming) return;
+    if (!content || isStreaming || messages.length >= MAX_MESSAGES) return;
     setInput("");
-    void runTurn([...messages, { id: crypto.randomUUID(), role: "user", content }]);
+    void runTurn([
+      ...messages,
+      { id: crypto.randomUUID(), role: "user", content },
+    ]);
+  };
+
+  // At the transcript cap: fold the whole thread into a short recap and reseed a
+  // fresh conversation with it, so the user keeps their context and can keep going
+  // instead of hitting a dead end.
+  const summarizeAndContinue = async () => {
+    if (isStreaming || isSummarizing) return;
+    setIsSummarizing(true);
+    try {
+      const { summary } = await getStreamingTRPCClient().chat.summarize.mutate({
+        messages: messages.map(({ role, content }) => ({ role, content })),
+      });
+      const recap = summary.trim();
+      setMessages(
+        recap
+          ? [
+              {
+                id: crypto.randomUUID(),
+                role: "assistant",
+                content: `_Here's where we left off:_\n\n${recap}`,
+              },
+            ]
+          : [],
+      );
+      setInput("");
+      setCurrentStep(null);
+      setAtBottom(true);
+      inputRef.current?.focus();
+    } catch {
+      toast.error("Couldn't summarize this one. You can start fresh instead.");
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
+  // Clear the board and begin a brand-new conversation.
+  const startFresh = () => {
+    if (isSummarizing) return;
+    abortRef.current?.abort();
+    setMessages([]);
+    setInput("");
+    setCurrentStep(null);
+    setAtBottom(true);
+    inputRef.current?.focus();
   };
 
   // Interrupt the in-flight answer; runTurn's abort branch keeps whatever text
@@ -237,7 +324,9 @@ export const ChatPanel = () => {
   // its follow-ups) and stream a fresh one from the same history.
   const regenerate = () => {
     if (isStreaming) return;
-    const lastUserIndex = messages.findLastIndex((message) => message.role === "user");
+    const lastUserIndex = messages.findLastIndex(
+      (message) => message.role === "user",
+    );
     if (lastUserIndex === -1) return;
     void runTurn(messages.slice(0, lastUserIndex + 1));
   };
@@ -249,7 +338,10 @@ export const ChatPanel = () => {
     if (!content || isStreaming) return;
     const index = messages.findIndex((message) => message.id === id);
     if (index === -1) return;
-    void runTurn([...messages.slice(0, index), { ...messages[index], content }]);
+    void runTurn([
+      ...messages.slice(0, index),
+      { ...messages[index], content },
+    ]);
   };
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -260,13 +352,20 @@ export const ChatPanel = () => {
   };
 
   const empty = messages.length === 0;
+  // Once the transcript hits the cap, swap the composer for the limit card so the
+  // next send can't fail server-side validation.
+  const atLimit = messages.length >= MAX_MESSAGES;
 
   return (
     <div className="relative flex h-full min-h-0 flex-col">
       {/* Soft blur so messages dissolve into the top edge as they scroll away. */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-8 backdrop-blur-sm mask-[linear-gradient(to_bottom,black,transparent)]" />
 
-      <div ref={scrollRef} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+      >
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-2 py-6 sm:px-4">
           {empty ? (
             <div className="flex flex-col items-center gap-8">
@@ -275,22 +374,33 @@ export const ChatPanel = () => {
                   <SparklesIcon className="size-6" />
                 </span>
                 <div className="space-y-1">
-                  <h2 className="font-heading text-xl font-semibold">Ask anything</h2>
-                  <p className="text-sm text-muted-foreground">Not sure where to start? Pick who you are.</p>
+                  <h2 className="font-heading text-xl font-semibold">
+                    Ask anything
+                  </h2>
+                  <p className="text-sm text-muted-foreground">
+                    Not sure where to start? Pick who you are.
+                  </p>
                 </div>
               </div>
               <div className="grid w-full gap-3 sm:grid-cols-2">
                 {SUGGESTION_GROUPS.map((group) => {
                   const Icon = group.icon;
                   return (
-                    <div key={group.persona} className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 text-left">
+                    <div
+                      key={group.persona}
+                      className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 text-left"
+                    >
                       <div className="flex items-center gap-2.5">
                         <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                           <Icon className="size-4" />
                         </span>
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-foreground">{group.persona}</p>
-                          <p className="text-xs text-muted-foreground">{group.tagline}</p>
+                          <p className="text-sm font-semibold text-foreground">
+                            {group.persona}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {group.tagline}
+                          </p>
                         </div>
                       </div>
                       <div className="flex flex-col gap-1.5">
@@ -321,7 +431,11 @@ export const ChatPanel = () => {
                 canSend={!isStreaming}
                 onSelectFollowup={(followup) => send(followup)}
                 // Regenerate hangs off the final assistant answer only.
-                showRegenerate={message.role === "assistant" && index === messages.length - 1 && !isStreaming}
+                showRegenerate={
+                  message.role === "assistant" &&
+                  index === messages.length - 1 &&
+                  !isStreaming
+                }
                 onRegenerate={regenerate}
                 canEdit={!isStreaming}
                 onEditSubmit={(content) => editAndResend(message.id, content)}
@@ -348,37 +462,56 @@ export const ChatPanel = () => {
           </Button>
         )}
         <div className="mx-auto w-full max-w-4xl px-2 sm:px-4">
-          {isStreaming && currentStep ? <StreamingStatus step={currentStep} /> : null}
-          <div className="relative flex items-end gap-2 rounded-2xl border border-input bg-card p-2 shadow-xs focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
-            <Textarea
-              ref={inputRef}
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={onKeyDown}
-              rows={1}
-              placeholder="Send a message…"
-              className="max-h-40 min-h-0 flex-1 resize-none border-0 bg-transparent px-2 py-1.5 shadow-none focus-visible:border-0 focus-visible:ring-0"
+          {atLimit ? (
+            <ConversationLimitCard
+              onSummarize={summarizeAndContinue}
+              onStartFresh={startFresh}
+              isSummarizing={isSummarizing}
             />
-            {isStreaming ? (
-              <Button type="button" size="icon" onClick={stop} className="size-8 rounded-lg" aria-label="Stop generating">
-                <SquareIcon className="size-3.5 fill-current" />
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                size="icon"
-                disabled={!input.trim()}
-                onClick={() => send(input)}
-                className="size-8 rounded-lg"
-                aria-label="Send message"
-              >
-                <ArrowUpIcon className="size-4" />
-              </Button>
-            )}
-          </div>
-          <p className="mt-2 text-center text-[11px] text-muted-foreground">
-            The assistant can make mistakes. Enter to send, Shift+Enter for a new line.
-          </p>
+          ) : (
+            <>
+              {isStreaming && currentStep ? (
+                <StreamingStatus step={currentStep} />
+              ) : null}
+              <div className="relative flex items-end gap-2 rounded-2xl border border-input bg-card p-2 shadow-xs focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+                <Textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={(event) => setInput(event.target.value)}
+                  onKeyDown={onKeyDown}
+                  rows={1}
+                  placeholder="Send a message…"
+                  className="max-h-40 min-h-0 flex-1 resize-none border-0 bg-transparent px-2 py-1.5 shadow-none focus-visible:border-0 focus-visible:ring-0"
+                />
+                {isStreaming ? (
+                  <Button
+                    type="button"
+                    size="icon"
+                    onClick={stop}
+                    className="size-8 rounded-lg"
+                    aria-label="Stop generating"
+                  >
+                    <SquareIcon className="size-3.5 fill-current" />
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    size="icon"
+                    disabled={!input.trim()}
+                    onClick={() => send(input)}
+                    className="size-8 rounded-lg"
+                    aria-label="Send message"
+                  >
+                    <ArrowUpIcon className="size-4" />
+                  </Button>
+                )}
+              </div>
+              <p className="mt-2 text-center text-[11px] text-muted-foreground">
+                The assistant can make mistakes. Enter to send, Shift+Enter for
+                a new line.
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -389,14 +522,22 @@ export const ChatPanel = () => {
 // emits (`[1]`, `[2]`, …) so KnowledgeMarkdown can turn those markers into
 // links. The order here mirrors the server's `sources` numbering.
 const buildCitations = (sources: ChatSource[]): CitationMap =>
-  Object.fromEntries(sources.map((source, index) => [index + 1, { href: buildNodeHref(source.section, source.id), title: source.title }]));
+  Object.fromEntries(
+    sources.map((source, index) => [
+      index + 1,
+      { href: buildNodeHref(source.section, source.id), title: source.title },
+    ]),
+  );
 
 // The distinct citation numbers the answer actually references. We retrieve a
 // wide net of chunks, but only the notes the model cites with a `[n]` marker
 // belong in the Sources strip — listing every retrieved note surfaces off-topic
 // results the answer never used. Numbers outside the known source range are
 // ignored so a stray `[9]` can't sneak in.
-const usedCitationNumbers = (content: string, sourceCount: number): Set<number> => {
+const usedCitationNumbers = (
+  content: string,
+  sourceCount: number,
+): Set<number> => {
   const used = new Set<number>();
   for (const match of content.matchAll(/\[(\d+)\]/g)) {
     const number = Number(match[1]);
@@ -432,8 +573,15 @@ const ChatBubble = ({
   // Only show the notes the answer actually cited, keeping each source's
   // original 1-based number so the strip's chips still line up with the inline
   // `[n]` markers even when earlier sources went uncited.
-  const used = sources.length > 0 ? usedCitationNumbers(message.content, sources.length) : undefined;
-  const citedSources = used ? sources.map((source, index) => ({ source, number: index + 1 })).filter(({ number }) => used.has(number)) : [];
+  const used =
+    sources.length > 0
+      ? usedCitationNumbers(message.content, sources.length)
+      : undefined;
+  const citedSources = used
+    ? sources
+        .map((source, index) => ({ source, number: index + 1 }))
+        .filter(({ number }) => used.has(number))
+    : [];
 
   // Local edit state for user messages: entering edit mode swaps the bubble for
   // a textarea seeded with the current text.
@@ -469,10 +617,20 @@ const ChatBubble = ({
             className="resize-none rounded-2xl bg-card"
           />
           <div className="flex justify-end gap-2">
-            <Button type="button" size="sm" variant="ghost" onClick={() => setIsEditing(false)}>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setIsEditing(false)}
+            >
               Cancel
             </Button>
-            <Button type="button" size="sm" disabled={!draft.trim()} onClick={submitEdit}>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!draft.trim()}
+              onClick={submitEdit}
+            >
               Send
             </Button>
           </div>
@@ -482,7 +640,9 @@ const ChatBubble = ({
   }
 
   return (
-    <div className={cn("group/message flex gap-3", isUser && "flex-row-reverse")}>
+    <div
+      className={cn("group/message flex gap-3", isUser && "flex-row-reverse")}
+    >
       {!isUser && (
         <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary ring-1 ring-primary/20">
           <SparklesIcon className="size-4" />
@@ -492,11 +652,18 @@ const ChatBubble = ({
           under it rather than beside the avatar. Assistant answers are markdown
           and use the full width; user messages stay a compact right-aligned
           bubble. */}
-      <div className={cn("flex min-w-0 flex-col gap-2", isUser ? "max-w-[80%] items-end" : "min-w-0 flex-1")}>
+      <div
+        className={cn(
+          "flex min-w-0 flex-col gap-2",
+          isUser ? "max-w-[80%] items-end" : "min-w-0 flex-1",
+        )}
+      >
         <div
           className={cn(
             "min-w-0 rounded-2xl text-sm",
-            isUser ? "bg-primary px-4 py-2.5 text-primary-foreground" : "bg-card px-5 py-4 ring-1 ring-border",
+            isUser
+              ? "bg-primary px-4 py-2.5 text-primary-foreground"
+              : "bg-card px-5 py-4 ring-1 ring-border",
           )}
         >
           {isUser ? (
@@ -510,8 +677,14 @@ const ChatBubble = ({
               {/* The phase timeline collapses into an expandable summary once the
                   answer starts, so the reader can see how the reply was built. */}
               {steps.length > 0 && <ThinkingTimeline steps={steps} />}
-              <KnowledgeMarkdown content={message.content} className="prose-sm" citations={citations} />
-              {citedSources.length > 0 && <ChatSources sources={citedSources} />}
+              <KnowledgeMarkdown
+                content={message.content}
+                className="prose-sm"
+                citations={citations}
+              />
+              {citedSources.length > 0 && (
+                <ChatSources sources={citedSources} />
+              )}
               {message.trace && <ChatTraceDetails trace={message.trace} />}
             </>
           )}
@@ -563,12 +736,16 @@ const ChatBubble = ({
 // Compact, collapsible "how I got here" panel: the raw trace metrics from
 // chat.send. This is the first surface for observability — persistence and a
 // richer admin view come later.
-const formatTokens = (value?: number) => (value === undefined ? "—" : value.toLocaleString());
+const formatTokens = (value?: number) =>
+  value === undefined ? "—" : value.toLocaleString();
 
-const formatMs = (ms: number) => (ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms} ms`);
+const formatMs = (ms: number) =>
+  ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms} ms`;
 
 const formatWarning = (warning: ChatWarning) =>
-  warning.type === "other" ? warning.message : `${warning.feature}${warning.details ? ` — ${warning.details}` : ""} (${warning.type})`;
+  warning.type === "other"
+    ? warning.message
+    : `${warning.feature}${warning.details ? ` — ${warning.details}` : ""} (${warning.type})`;
 
 const ChatTraceDetails = ({ trace }: { trace: ChatTrace }) => {
   const [open, setOpen] = useState(false);
@@ -585,20 +762,22 @@ const ChatTraceDetails = ({ trace }: { trace: ChatTrace }) => {
       ],
     },
     {
-      label: "Retrieval",
+      label: "Tools",
       rows: [
-        ["Chunks retrieved", `${trace.retrievedChunkCount}`],
-        ["Chunks in prompt", `${trace.includedChunkCount}`],
-        ["Sources", `${trace.sourceCount}`],
+        ["Tool calls", `${trace.toolCallCount}`],
+        ["Sources cited", `${trace.sourceCount}`],
       ],
     },
     {
       label: "Timing",
-      // "Total" lives in the collapsed summary header, so it's omitted here to
-      // keep this group aligned to three rows like the others.
+      // "Total" lives in the collapsed summary header, so it's omitted here.
       rows: [
-        ["Retrieval", formatMs(trace.retrievalDurationMs)],
-        ["First token", trace.timeToFirstTokenMs === null ? "—" : formatMs(trace.timeToFirstTokenMs)],
+        [
+          "First token",
+          trace.timeToFirstTokenMs === null
+            ? "—"
+            : formatMs(trace.timeToFirstTokenMs),
+        ],
         ["Generation", formatMs(trace.generationDurationMs)],
       ],
     },
@@ -617,7 +796,8 @@ const ChatTraceDetails = ({ trace }: { trace: ChatTrace }) => {
         Trace
         {/* At-a-glance summary so the key numbers are visible while collapsed. */}
         <span className="font-mono font-normal text-muted-foreground/70">
-          {formatTokens(trace.totalTokens)} tokens · {formatMs(trace.totalDurationMs)}
+          {formatTokens(trace.totalTokens)} tokens ·{" "}
+          {formatMs(trace.totalDurationMs)}
         </span>
         {warningCount > 0 && (
           <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-500">
@@ -625,25 +805,38 @@ const ChatTraceDetails = ({ trace }: { trace: ChatTrace }) => {
             {warningCount}
           </span>
         )}
-        <ChevronDownIcon className={cn("ml-auto size-3 shrink-0 transition-transform", open && "rotate-180")} />
+        <ChevronDownIcon
+          className={cn(
+            "ml-auto size-3 shrink-0 transition-transform",
+            open && "rotate-180",
+          )}
+        />
       </button>
 
       {open && (
         <div className="mt-2.5 space-y-2.5">
           {/* Model + finish reason as a header row above the metric groups. */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-            <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-foreground">{trace.model}</span>
+            <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-foreground">
+              {trace.model}
+            </span>
             <span className="text-muted-foreground">
-              finished: <span className="text-foreground">{trace.finishReason}</span>
+              finished:{" "}
+              <span className="text-foreground">{trace.finishReason}</span>
             </span>
           </div>
 
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
             {groups.map((group) => (
               <dl key={group.label} className="space-y-1">
-                <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">{group.label}</dt>
+                <dt className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                  {group.label}
+                </dt>
                 {group.rows.map(([label, value]) => (
-                  <div key={label} className="flex justify-between gap-2 text-[11px] text-muted-foreground">
+                  <div
+                    key={label}
+                    className="flex justify-between gap-2 text-[11px] text-muted-foreground"
+                  >
                     <span>{label}</span>
                     <span className="font-mono text-foreground">{value}</span>
                   </div>
@@ -654,11 +847,16 @@ const ChatTraceDetails = ({ trace }: { trace: ChatTrace }) => {
 
           {trace.warnings && trace.warnings.length > 0 && (
             <div className="space-y-1">
-              <div className="text-[10px] font-medium uppercase tracking-wide text-amber-600/80 dark:text-amber-500/80">Warnings</div>
+              <div className="text-[10px] font-medium uppercase tracking-wide text-amber-600/80 dark:text-amber-500/80">
+                Warnings
+              </div>
               {trace.warnings.map((warning) => {
                 const text = formatWarning(warning);
                 return (
-                  <div key={`${warning.type}:${text}`} className="flex items-start gap-1.5 text-[11px] text-amber-600 dark:text-amber-500">
+                  <div
+                    key={`${warning.type}:${text}`}
+                    className="flex items-start gap-1.5 text-[11px] text-amber-600 dark:text-amber-500"
+                  >
                     <TriangleAlertIcon className="mt-0.5 size-3 shrink-0" />
                     <span>{text}</span>
                   </div>
@@ -672,18 +870,21 @@ const ChatTraceDetails = ({ trace }: { trace: ChatTrace }) => {
   );
 };
 
-const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+const plural = (count: number, noun: string) =>
+  `${count} ${noun}${count === 1 ? "" : "s"}`;
 
 // Human-readable label for a streamed phase. `retrieved` folds in the real
 // counts so the timeline reports what actually happened, not a canned string.
 const stepLabel = (step: ChatStep): string => {
   switch (step.phase) {
-    case "retrieving":
-      return "Searching notes";
-    case "retrieved":
-      return step.sourceCount > 0
-        ? `Found ${plural(step.chunkCount, "passage")} across ${plural(step.sourceCount, "note")}`
-        : "No matching notes — answering from general knowledge";
+    case "thinking":
+      return "Thinking";
+    case "tool-call":
+      return step.label;
+    case "tool-result":
+      return step.resultCount > 0
+        ? `Found ${plural(step.resultCount, "result")}`
+        : "Nothing found";
     case "generating":
       return "Drafting an answer";
     case "suggesting":
@@ -696,10 +897,14 @@ const stepLabel = (step: ChatStep): string => {
 // folded in once retrieval finishes.
 const streamingLabel = (step: ChatStep): string => {
   switch (step.phase) {
-    case "retrieving":
-      return "Retrieving";
-    case "retrieved":
-      return step.chunkCount > 0 ? `Retrieved ${plural(step.chunkCount, "chunk")}` : "No matching notes";
+    case "thinking":
+      return "Thinking";
+    case "tool-call":
+      return step.label;
+    case "tool-result":
+      return step.resultCount > 0
+        ? `Found ${plural(step.resultCount, "result")}`
+        : "Nothing found";
     case "generating":
       return "Generating";
     case "suggesting":
@@ -715,7 +920,11 @@ const StreamingStatus = ({ step }: { step: ChatStep }) => (
     <span>{streamingLabel(step)}</span>
     <span className="inline-flex items-end gap-0.5 pb-0.5">
       {[0, 200, 400].map((delay) => (
-        <span key={delay} className="size-1 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: `${delay}ms` }} />
+        <span
+          key={delay}
+          className="size-1 animate-bounce rounded-full bg-muted-foreground/60"
+          style={{ animationDelay: `${delay}ms` }}
+        />
       ))}
     </span>
   </div>
@@ -735,14 +944,45 @@ const ThinkingTimeline = ({ steps }: { steps: ChatStep[] }) => {
       >
         <SparklesIcon className="size-3 shrink-0" />
         Worked through {plural(steps.length, "step")}
-        <ChevronDownIcon className={cn("ml-auto size-3 shrink-0 transition-transform", open && "rotate-180")} />
+        <ChevronDownIcon
+          className={cn(
+            "ml-auto size-3 shrink-0 transition-transform",
+            open && "rotate-180",
+          )}
+        />
       </button>
       {open && (
-        <ul className="mt-2 flex flex-col gap-1">
+        <ul className="mt-2 flex flex-col gap-1.5">
           {steps.map((step) => (
-            <li key={step.phase} className="flex items-center gap-2 text-[11px] text-muted-foreground">
-              <CheckIcon className="size-3 shrink-0 text-primary/70" />
-              <span>{stepLabel(step)}</span>
+            <li
+              key={
+                step.phase === "tool-call" || step.phase === "tool-result"
+                  ? `${step.phase}-${step.toolCallId}`
+                  : step.phase
+              }
+              className="flex flex-col gap-1 text-[11px] text-muted-foreground"
+            >
+              <div className="flex items-center gap-2">
+                <CheckIcon className="size-3 shrink-0 text-primary/70" />
+                <span>{stepLabel(step)}</span>
+              </div>
+              {step.phase === "tool-result" && step.sources.length > 0 && (
+                <div className="ml-5 flex flex-wrap gap-1">
+                  {/* One note can surface via several chunks, so collapse to distinct notes. */}
+                  {[...new Map(step.sources.map((source) => [source.id, source])).values()].map((source) => {
+                    const Icon = getSectionIcon(source.section);
+                    return (
+                      <span
+                        key={source.id}
+                        className="inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-[10px] text-muted-foreground"
+                      >
+                        <Icon className="size-2.5 shrink-0" />
+                        <span className="truncate">{source.title}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -751,9 +991,15 @@ const ThinkingTimeline = ({ steps }: { steps: ChatStep[] }) => {
   );
 };
 
-const ChatSources = ({ sources }: { sources: Array<{ source: ChatSource; number: number }> }) => (
+const ChatSources = ({
+  sources,
+}: {
+  sources: Array<{ source: ChatSource; number: number }>;
+}) => (
   <div className="mt-3 flex flex-wrap gap-1.5 border-t border-border/60 pt-2.5">
-    <span className="w-full text-[11px] font-medium text-muted-foreground">Sources</span>
+    <span className="w-full text-[11px] font-medium text-muted-foreground">
+      Sources
+    </span>
     {sources.map(({ source, number }) => {
       const Icon = getSectionIcon(source.section);
       return (
@@ -774,12 +1020,68 @@ const ChatSources = ({ sources }: { sources: Array<{ source: ChatSource; number:
   </div>
 );
 
+// Shown in place of the composer once the conversation hits the message cap.
+// Rather than dead-ending on a validation error, it offers to recap the thread
+// and keep going, or wipe the slate — with a little of the assistant's dry voice.
+const ConversationLimitCard = ({
+  onSummarize,
+  onStartFresh,
+  isSummarizing,
+}: {
+  onSummarize: () => void;
+  onStartFresh: () => void;
+  isSummarizing: boolean;
+}) => (
+  <div className="mx-auto flex max-w-2xl flex-col items-center gap-3 rounded-2xl border border-border bg-card p-5 text-center">
+    <div className="space-y-1">
+      <p className="text-sm font-medium text-foreground">
+        Well, we've talked this one to the limit.
+      </p>
+      <p className="text-xs text-muted-foreground">
+        I can recap where we left off and keep going, or we start with a clean
+        slate.
+      </p>
+    </div>
+    <div className="flex flex-wrap items-center justify-center gap-2">
+      <Button
+        type="button"
+        size="sm"
+        onClick={onSummarize}
+        disabled={isSummarizing}
+        className="gap-1.5"
+      >
+        {isSummarizing ? (
+          <Loader2Icon className="size-4 animate-spin" />
+        ) : (
+          <SparklesIcon className="size-4" />
+        )}
+        Summarize & continue
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={onStartFresh}
+        disabled={isSummarizing}
+        className="gap-1.5"
+      >
+        <RefreshCwIcon className="size-4" />
+        Start fresh
+      </Button>
+    </div>
+  </div>
+);
+
 // The three bouncing dots shown inside an assistant bubble while we wait for
 // the first streamed token. The bubble itself supplies the avatar and card.
 const TypingDots = () => (
   <div className="flex items-center gap-1 py-1">
     {[0, 150, 300].map((delay) => (
-      <span key={delay} className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60" style={{ animationDelay: `${delay}ms` }} />
+      <span
+        key={delay}
+        className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60"
+        style={{ animationDelay: `${delay}ms` }}
+      />
     ))}
   </div>
 );
