@@ -1,5 +1,3 @@
-import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
 import { embedNode } from "@/features/knowledge/server/embeddings";
 import { langfuseSpanProcessor } from "@/instrumentation.node";
 import { prisma } from "@/lib/db";
