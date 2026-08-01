@@ -13,6 +13,7 @@ import {
   HomeIcon,
   Loader2Icon,
   PanelLeftIcon,
+  PencilRulerIcon,
   SparklesIcon,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
@@ -52,6 +53,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Projects", href: "/projects", icon: FolderOpenIcon },
   { label: "AI Workflows", href: "/workflows", icon: BotIcon },
   { label: "AI Chat", href: "/chat", icon: SparklesIcon },
+  { label: "Draw", href: "/draw", icon: PencilRulerIcon },
 ];
 
 /** First path segment mapped to a knowledge section, if we're inside a hub. */
