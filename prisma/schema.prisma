@@ -20,6 +20,7 @@ model User {
   accounts    Account[]
   nodes       Node[]
   routeCovers RouteCover[]
+  diagrams    Diagram[]
 
   @@unique([email])
   @@map("user")
@@ -104,8 +105,9 @@ model Node {
   parent   Node?   @relation("NodeTree", fields: [parentId], references: [id], onDelete: Cascade)
   children Node[]  @relation("NodeTree")
 
-  images NodeImage[]
-  chunks NodeChunk[]
+  images   NodeImage[]
+  chunks   NodeChunk[]
+  diagrams Diagram[]   @relation("NodeDiagrams")
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -197,6 +199,36 @@ model NodeChunk {
 enum NodeType {
   SPACE
   PAGE
+}
+
+/// A standalone Excalidraw scene that can be embedded inside a page's Markdown
+/// body via a fenced `excalidraw` token carrying this row's id. Each diagram is
+/// independent: it owns its own scene and viewport, is fully interactive for
+/// anyone viewing, but only the owner can persist changes (everyone else's edits
+/// reset on refresh because the scene is only ever read once into initialData).
+model Diagram {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Optional owning page: scopes reads to that page's visibility and cascades
+  /// cleanup when the page is deleted. Removing the token from the body leaves
+  /// the row (orphan) — it is not garbage collected.
+  nodeId String?
+  node   Node?   @relation("NodeDiagrams", fields: [nodeId], references: [id], onDelete: Cascade)
+
+  title String?
+
+  /// The Excalidraw scene: `{ elements: ExcalidrawElement[], files?: BinaryFiles }`.
+  /// Raster images live inline as base64 in `files` (fine for shape diagrams).
+  scene Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([nodeId])
 }
 
 /// A full-width cover/banner image for a top-level app route (e.g. the

@@ -8,8 +8,37 @@ import rehypeSlug from "rehype-slug";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { EmbeddedDiagram } from "@/features/diagram/components/embedded-diagram";
 import { CITATION_HREF_PREFIX, remarkCitations } from "@/features/knowledge/lib/remark-citations";
 import { cn } from "@/lib/utils";
+
+// A minimal structural view of the hast `<pre>` node react-markdown hands the
+// `pre` component — enough to spot a fenced code block and pull its language +
+// text, without importing hast's types (kept dependency-light).
+type HastElement = {
+  type?: string;
+  tagName?: string;
+  properties?: { className?: unknown };
+  children?: Array<{ type?: string; value?: string } & Partial<HastElement>>;
+};
+
+/**
+ * A fenced ```excalidraw block carries a single diagram id on its own line. We
+ * intercept it at the `pre` level (reading the hast node) so the interactive
+ * canvas replaces the whole code block instead of being nested inside an invalid
+ * `<pre><code>`. Returns the trimmed id, or null for any other code block.
+ */
+const excalidrawDiagramId = (node: HastElement | undefined): string | null => {
+  const code = node?.children?.[0];
+  if (code?.type !== "element" || code.tagName !== "code") return null;
+  const className = code.properties?.className;
+  const isExcalidraw =
+    Array.isArray(className) && className.includes("language-excalidraw");
+  if (!isExcalidraw) return null;
+  const text = code.children?.[0];
+  const id = text?.type === "text" ? (text.value ?? "").trim() : "";
+  return id || null;
+};
 
 /**
  * An inline image that opens a full-screen lightbox on click so readers can view
@@ -134,6 +163,11 @@ export const KnowledgeMarkdown = ({
             return <a target="_blank" rel="noopener noreferrer" href={href} {...props}>{children}</a>;
           },
           img: ({ node, ...props }) => <LightboxImage {...props} />,
+          pre: ({ node, children, ...props }) => {
+            const diagramId = excalidrawDiagramId(node);
+            if (diagramId) return <EmbeddedDiagram diagramId={diagramId} />;
+            return <pre {...props}>{children}</pre>;
+          },
         }}
       >
         {content}

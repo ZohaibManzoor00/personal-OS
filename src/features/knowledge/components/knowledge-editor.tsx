@@ -1,13 +1,22 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { CheckIcon, ImageIcon, Loader2Icon, PencilIcon, SparklesIcon, TerminalIcon } from "lucide-react";
+import {
+  CheckIcon,
+  ImageIcon,
+  Loader2Icon,
+  NetworkIcon,
+  PencilIcon,
+  SparklesIcon,
+  TerminalIcon,
+} from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Toggle } from "@/components/ui/toggle";
 import { useIsOwner } from "@/features/auth/hooks/use-is-owner";
+import { useCreateDiagram } from "@/features/diagram/hooks/use-diagram";
 import { useKnowledgeNode, usePolishMarkdown, usePreviewHotkeys, useUpdateNode } from "../hooks/use-knowledge";
 import { useVimMode } from "../hooks/use-vim-mode";
 import { KnowledgeImageInsertDialog } from "./knowledge-image-insert-dialog";
@@ -33,6 +42,7 @@ export const KnowledgeEditor = ({
   const { isOwner } = useIsOwner();
   const updateNode = useUpdateNode();
   const polishMarkdown = usePolishMarkdown();
+  const createDiagram = useCreateDiagram();
 
   const router = useRouter();
   const pathname = usePathname();
@@ -114,6 +124,20 @@ export const KnowledgeEditor = ({
     setPendingImages((prev) => prev.slice(1));
   }, []);
 
+  // Create a blank diagram tied to this page and drop its fenced token at the
+  // caret. The owner then draws into it and hits Save on the embed itself.
+  const handleInsertDiagram = () => {
+    if (createDiagram.isPending) return;
+    insertPosRef.current = editorRef.current?.getSelectionHead() ?? content.length;
+    createDiagram.mutate(
+      { nodeId },
+      {
+        onSuccess: (diagram) =>
+          insertMarkdown(`\n\`\`\`excalidraw\n${diagram.id}\n\`\`\`\n`),
+      },
+    );
+  };
+
   const handlePickImage = () => {
     const input = document.createElement("input");
     input.type = "file";
@@ -193,6 +217,20 @@ export const KnowledgeEditor = ({
               <Button variant="outline" size="sm" onClick={handlePickImage}>
                 <ImageIcon className="size-4" />
                 Image
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleInsertDiagram}
+                disabled={createDiagram.isPending}
+                title="Insert an embedded Excalidraw diagram"
+              >
+                {createDiagram.isPending ? (
+                  <Loader2Icon className="size-4 animate-spin" />
+                ) : (
+                  <NetworkIcon className="size-4" />
+                )}
+                Diagram
               </Button>
               {!autoSave && isDirty && (
                 <Button variant="outline" size="sm" onClick={handleSave} disabled={updateNode.isPending}>
