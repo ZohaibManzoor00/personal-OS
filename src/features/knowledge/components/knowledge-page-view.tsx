@@ -37,6 +37,10 @@ const KnowledgePageContent = ({ nodeId, headerRef }: { nodeId: string; headerRef
   const section = useKnowledgeSection();
   const { data: node } = useKnowledgeNode(nodeId);
 
+  // Lets the reader hide the outline and give the document (and any embedded
+  // diagrams) the full column width. Toggled from the editor header.
+  const [expanded, setExpanded] = useState(false);
+
   useRecordView(nodeId);
   useScrollToMatch("[data-knowledge-body]");
 
@@ -47,12 +51,20 @@ const KnowledgePageContent = ({ nodeId, headerRef }: { nodeId: string; headerRef
     // it toward the left edge — so it stays a consistent distance from the app
     // sidebar whether that sidebar is expanded or collapsed.
     <div className="flex items-start gap-8 xl:gap-16">
-      <KnowledgeToc
-        rootSelector="[data-knowledge-body]"
-        className="sticky top-20 hidden max-h-[calc(100vh-6rem)] w-64 shrink-0 self-start overflow-y-auto py-1 xl:block"
-      />
+      {!expanded && (
+        <KnowledgeToc
+          rootSelector="[data-knowledge-body]"
+          className="sticky top-20 hidden max-h-[calc(100vh-6rem)] w-64 shrink-0 self-start overflow-y-auto py-1 xl:block"
+        />
+      )}
       <div className="min-w-0 flex-1 rounded-xl border bg-card p-6 shadow-sm sm:p-8 lg:p-10">
-        <KnowledgeEditor nodeId={nodeId} onDeleted={goToParent} sentinelRef={headerRef} />
+        <KnowledgeEditor
+          nodeId={nodeId}
+          onDeleted={goToParent}
+          sentinelRef={headerRef}
+          expanded={expanded}
+          onToggleExpanded={() => setExpanded((value) => !value)}
+        />
       </div>
     </div>
   );

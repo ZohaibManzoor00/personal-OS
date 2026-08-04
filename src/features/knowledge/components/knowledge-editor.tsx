@@ -5,6 +5,8 @@ import {
   CheckIcon,
   ImageIcon,
   Loader2Icon,
+  Maximize2Icon,
+  Minimize2Icon,
   NetworkIcon,
   PencilIcon,
   SparklesIcon,
@@ -33,10 +35,14 @@ export const KnowledgeEditor = ({
   nodeId,
   onDeleted,
   sentinelRef,
+  expanded,
+  onToggleExpanded,
 }: {
   nodeId: string;
   onDeleted?: () => void;
   sentinelRef?: React.Ref<HTMLDivElement>;
+  expanded?: boolean;
+  onToggleExpanded?: () => void;
 }) => {
   const { data: node } = useKnowledgeNode(nodeId);
   const { isOwner } = useIsOwner();
@@ -254,6 +260,22 @@ export const KnowledgeEditor = ({
               Edit
             </Button>
           ) : null}
+          {onToggleExpanded && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onToggleExpanded}
+              className="hidden xl:inline-flex"
+              title={expanded ? "Show outline" : "Hide outline for more space"}
+            >
+              {expanded ? (
+                <Minimize2Icon className="size-4" />
+              ) : (
+                <Maximize2Icon className="size-4" />
+              )}
+              {expanded ? "Minimize" : "Expand"}
+            </Button>
+          )}
           <KnowledgeNodeMenu node={node} onDeleted={onDeleted} />
         </div>
       </div>

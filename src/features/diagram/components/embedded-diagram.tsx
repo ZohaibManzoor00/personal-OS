@@ -64,7 +64,13 @@ export const EmbeddedDiagram = ({ diagramId }: { diagramId: string }) => {
   };
 
   return (
-    <div className="not-prose my-6 overflow-hidden rounded-xl border border-border bg-background">
+    // `data-diagram-embed` marks this subtree so the page's table of contents
+    // ignores headings Excalidraw renders in its own UI ("Shapes", "Canvas
+    // actions", …), which would otherwise leak into the TOC.
+    <div
+      data-diagram-embed
+      className="not-prose my-6 overflow-hidden rounded-xl border border-border bg-background"
+    >
       <div className="flex items-center gap-1.5 border-b border-border/60 px-3 py-2 text-[11px] font-medium text-muted-foreground">
         <NetworkIcon className="size-3" />
         {data?.title || "Diagram"}

@@ -29,7 +29,12 @@ export const useTableOfContents = (rootSelector: string) => {
     }
 
     const collect = () => {
-      const headings = Array.from(root.querySelectorAll<HTMLElement>(HEADING_SELECTOR));
+      // Ignore headings rendered inside an embedded diagram — Excalidraw's own UI
+      // ("Shapes", "Canvas actions", …) would otherwise pollute the outline and
+      // churn as the board re-renders (e.g. on sidebar toggle).
+      const headings = Array.from(
+        root.querySelectorAll<HTMLElement>(HEADING_SELECTOR),
+      ).filter((el) => !el.closest("[data-diagram-embed]"));
       setItems((prev) => {
         const next = headings.map((el) => ({ id: el.id, text: el.textContent?.trim() ?? "", level: Number(el.tagName[1]) }));
         // Skip the state update (and downstream effects) when nothing changed,
