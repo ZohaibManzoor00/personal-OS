@@ -7,9 +7,62 @@ import { type ComponentProps, useEffect, useMemo, useState } from "react";
 
 // The imperative API handle Excalidraw hands back, derived from the prop so we
 // don't depend on a deep type import path (same trick as the draw canvas).
-type ExcalidrawApi = Parameters<NonNullable<ComponentProps<typeof Excalidraw>["excalidrawAPI"]>>[0];
+type ExcalidrawApi = Parameters<
+  NonNullable<ComponentProps<typeof Excalidraw>["excalidrawAPI"]>
+>[0];
 
 type BinaryFiles = ReturnType<ExcalidrawApi["getFiles"]>;
+
+type LooseElement = Record<string, unknown> & {
+  id?: string;
+  type?: string;
+  containerId?: string | null;
+};
+
+/**
+ * Prepares a stored scene for loading. Excalidraw requires a container's bound
+ * text (and an arrow's label) to be its *immediate* successor in fractional-
+ * index order; a stored scene can violate that (mermaid- or programmatically-
+ * built scenes especially), which trips "Fractional indices invariant for bound
+ * elements has been compromised" (fatal in dev) and mis-orders labels on the
+ * canvas in prod. So we (1) reorder every bound text to sit right after its
+ * container, then (2) drop the stored `index` values so Excalidraw regenerates a
+ * consistent set from this corrected order.
+ */
+const normalizeScene = (raw: unknown[]): Record<string, unknown>[] => {
+  const elements = raw as LooseElement[];
+  const byId = new Map(elements.map((element) => [element.id, element]));
+
+  const boundTextByContainer = new Map<string, LooseElement>();
+  for (const element of elements) {
+    if (element.type === "text" && element.containerId) {
+      boundTextByContainer.set(element.containerId, element);
+    }
+  }
+
+  const ordered: LooseElement[] = [];
+  for (const element of elements) {
+    // A bound text is emitted right after its container below; skip it here.
+    // (If its container is missing, fall through and keep it in place.)
+    if (
+      element.type === "text" &&
+      element.containerId &&
+      byId.has(element.containerId)
+    ) {
+      continue;
+    }
+    ordered.push(element);
+    const boundText = element.id
+      ? boundTextByContainer.get(element.id)
+      : undefined;
+    if (boundText) ordered.push(boundText);
+  }
+
+  return ordered.map((element) => {
+    const { index: _index, ...rest } = element;
+    return rest;
+  });
+};
 
 /** Reading the live scene back out for a save (elements + any pasted images). */
 export type EmbeddedDiagramApi = {
@@ -41,20 +94,15 @@ export default function EmbeddedDiagramCanvas({
   const { resolvedTheme } = useTheme();
   const [api, setApi] = useState<ExcalidrawApi | null>(null);
 
-  // Drop each element's stored fractional `index` so Excalidraw regenerates
-  // contiguous indices from the array order, and repair dangling bindings. A
-  // stored scene keeps its raw indices, and `restore` won't touch ones it deems
-  // valid — but a container's bound text must sit immediately after it in index
-  // order, an adjacency the round-trip can break. Without this, Excalidraw
-  // throws "Fractional indices invariant for bound elements has been
-  // compromised" (fatal in dev). Computed once so the board never resets.
+  // Reorder bound text after their containers and regenerate fractional indices,
+  // then let restore repair any dangling bindings. Computed once so the board
+  // never resets. See `normalizeScene` for why this is required.
   const initialData = useMemo(
     () => ({
       elements: restoreElements(
-        elements.map((element) => {
-          const { index: _index, ...rest } = element as Record<string, unknown>;
-          return rest;
-        }) as unknown as Parameters<typeof restoreElements>[0],
+        normalizeScene(elements) as unknown as Parameters<
+          typeof restoreElements
+        >[0],
         null,
         { repairBindings: true },
       ),
@@ -69,11 +117,19 @@ export default function EmbeddedDiagramCanvas({
     onReady({
       getScene: () => ({
         // Drop tombstoned elements so a save doesn't grow the stored scene.
-        elements: api.getSceneElements().filter((element) => !element.isDeleted),
+        elements: api
+          .getSceneElements()
+          .filter((element) => !element.isDeleted),
         files: api.getFiles(),
       }),
     });
   }, [api, onReady]);
 
-  return <Excalidraw excalidrawAPI={setApi} initialData={initialData} theme={resolvedTheme === "dark" ? "dark" : "light"} />;
+  return (
+    <Excalidraw
+      excalidrawAPI={setApi}
+      initialData={initialData}
+      theme={resolvedTheme === "dark" ? "dark" : "light"}
+    />
+  );
 }
