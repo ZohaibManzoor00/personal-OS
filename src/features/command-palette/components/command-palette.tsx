@@ -18,15 +18,7 @@ import {
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
-import {
-  Command,
-  CommandDialog,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from "@/components/ui/command";
+import { Command, CommandDialog, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useIsOwner } from "@/features/auth/hooks/use-is-owner";
 import { Highlighted, ResultBreadcrumbTitle } from "@/features/knowledge/components/knowledge-highlight";
@@ -143,9 +135,7 @@ export const CommandPalette = () => {
   useEffect(() => {
     if (!open || ask !== null) return;
     const frame = requestAnimationFrame(() => {
-      document
-        .querySelector<HTMLInputElement>('[data-slot="command-input"]')
-        ?.focus();
+      document.querySelector<HTMLInputElement>('[data-slot="command-input"]')?.focus();
     });
     return () => cancelAnimationFrame(frame);
   }, [open, ask]);
@@ -211,153 +201,152 @@ export const CommandPalette = () => {
       {ask !== null ? (
         <AskAiView question={ask} onBack={backToSearch} />
       ) : (
-      <Command shouldFilter={false} loop className="rounded-none bg-transparent p-0">
-        <CommandInput value={input} onValueChange={setInput} onKeyDown={handleTabNavigation} placeholder="Search everything or jump to…" />
-        <CommandList className="mt-1 max-h-[60vh] border-t p-1.5">
-          {hasQuery && isSearching && !results ? (
-            <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
-              <Loader2Icon className="size-4 animate-spin" />
-              Searching…
-            </div>
-          ) : null}
+        <Command shouldFilter={false} loop className="rounded-none bg-transparent p-0">
+          <CommandInput
+            value={input}
+            onValueChange={setInput}
+            onKeyDown={handleTabNavigation}
+            placeholder="Search everything or jump to…"
+          />
+          <CommandList className="mt-1 max-h-[60vh] border-t p-1.5">
+            {hasQuery && isSearching && !results ? (
+              <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+                <Loader2Icon className="size-4 animate-spin" />
+                Searching…
+              </div>
+            ) : null}
 
-          {!hasQuery && recents && recents.length > 0 ? (
-            <CommandGroup heading="Recent">
-              {recents.map((node) => {
-                const Icon = node.type === "SPACE" ? FolderIcon : FileTextIcon;
-                return (
-                  <CommandItem
-                    key={node.id}
-                    value={`recent-${node.id}`}
-                    onSelect={() => goToNode(node.section, node.id, node.type)}
-                    className="gap-3 rounded-lg px-2 py-2"
-                  >
-                    <ItemIcon icon={Icon} />
-                    <span className="min-w-0 flex-1 truncate">{node.title}</span>
-                    <SectionBadge section={node.section} />
-                  </CommandItem>
-                );
-              })}
-            </CommandGroup>
-          ) : null}
-
-          {hasQuery
-            ? groups.map((group) => (
-                <CommandGroup key={group.section} heading={group.label}>
-                  {group.results.map((node) => {
-                    const Icon = node.type === "SPACE" ? FolderIcon : FileTextIcon;
-                    return (
-                      <CommandItem
-                        key={node.id}
-                        value={`result-${node.id}`}
-                        onSelect={() => goToNode(node.section, node.id, node.type)}
-                        className="items-start gap-3 rounded-lg px-2 py-2"
-                      >
-                        <ItemIcon icon={Icon} />
-                        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                          <ResultBreadcrumbTitle breadcrumb={node.breadcrumb} titleHighlight={node.titleHighlight} />
-                          {node.snippet ? (
-                            <p className="line-clamp-1 text-xs text-muted-foreground">
-                              <Highlighted value={node.snippet} />
-                            </p>
-                          ) : null}
-                        </div>
-                      </CommandItem>
-                    );
-                  })}
-                </CommandGroup>
-              ))
-            : null}
-
-          {hasQuery ? (
-            <>
-              <CommandSeparator />
-              <CommandGroup heading="Ask">
-                <CommandItem
-                  value="ask-ai"
-                  onSelect={() => setAsk(query)}
-                  className="gap-3 rounded-lg px-2 py-2"
-                >
-                  <ItemIcon icon={SparklesIcon} />
-                  <span className="min-w-0 flex-1 truncate">
-                    Ask AI: "{query}"
-                  </span>
-                </CommandItem>
-              </CommandGroup>
-            </>
-          ) : null}
-
-          {isOwner ? (
-            <>
-              <CommandSeparator />
-              <CommandGroup heading={hasQuery ? "Create" : "Quick actions"}>
-                <CommandItem value="create-page" onSelect={() => quickCreate("PAGE")} className="gap-3 rounded-lg px-2 py-2">
-                  <ItemIcon icon={FilePlusIcon} />
-                  <span>
-                    {hasQuery ? `Create page "${query}"` : "New page"}
-                    {!hasQuery && currentSection ? (
-                      <span className="ml-1 text-xs text-muted-foreground">in {resolveSectionLabel(currentSection)}</span>
-                    ) : null}
-                  </span>
-                </CommandItem>
-                <CommandItem value="create-space" onSelect={() => quickCreate("SPACE")} className="gap-3 rounded-lg px-2 py-2">
-                  <ItemIcon icon={FolderPlusIcon} />
-                  <span>{hasQuery ? `Create space "${query}"` : "New space"}</span>
-                </CommandItem>
-              </CommandGroup>
-            </>
-          ) : null}
-
-          {navItems.length > 0 ? (
-            <>
-              <CommandSeparator />
-              <CommandGroup heading="Go to">
-                {navItems.map((item) => {
-                  const active = pathname.startsWith(item.href);
+            {!hasQuery && recents && recents.length > 0 ? (
+              <CommandGroup heading="Recent">
+                {recents.map((node) => {
+                  const Icon = node.type === "SPACE" ? FolderIcon : FileTextIcon;
                   return (
                     <CommandItem
-                      key={item.href}
-                      value={`nav-${item.href}`}
-                      onSelect={() => run(() => router.push(item.href))}
+                      key={node.id}
+                      value={`recent-${node.id}`}
+                      onSelect={() => goToNode(node.section, node.id, node.type)}
                       className="gap-3 rounded-lg px-2 py-2"
                     >
-                      <ItemIcon icon={item.icon} />
-                      <span className="flex-1">{item.label}</span>
-                      {active ? <span className="text-xs text-muted-foreground">current</span> : null}
+                      <ItemIcon icon={Icon} />
+                      <span className="min-w-0 flex-1 truncate">{node.title}</span>
+                      <SectionBadge section={node.section} />
                     </CommandItem>
                   );
                 })}
-                {!hasQuery || "toggle sidebar".includes(query.toLowerCase()) ? (
-                  <CommandItem value="toggle-sidebar" onSelect={() => run(toggleSidebar)} className="gap-3 rounded-lg px-2 py-2">
-                    <ItemIcon icon={PanelLeftIcon} />
-                    <span>Toggle sidebar</span>
-                  </CommandItem>
-                ) : null}
               </CommandGroup>
-            </>
-          ) : null}
-        </CommandList>
+            ) : null}
 
-        <div className="flex items-center justify-between gap-2 border-t px-3 py-2 text-[11px] text-muted-foreground">
-          <div className="flex items-center gap-3">
+            {hasQuery
+              ? groups.map((group) => (
+                  <CommandGroup key={group.section} heading={group.label}>
+                    {group.results.map((node) => {
+                      const Icon = node.type === "SPACE" ? FolderIcon : FileTextIcon;
+                      return (
+                        <CommandItem
+                          key={node.id}
+                          value={`result-${node.id}`}
+                          onSelect={() => goToNode(node.section, node.id, node.type)}
+                          className="items-start gap-3 rounded-lg px-2 py-2"
+                        >
+                          <ItemIcon icon={Icon} />
+                          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                            <ResultBreadcrumbTitle breadcrumb={node.breadcrumb} titleHighlight={node.titleHighlight} />
+                            {node.snippet ? (
+                              <p className="line-clamp-1 text-xs text-muted-foreground">
+                                <Highlighted value={node.snippet} />
+                              </p>
+                            ) : null}
+                          </div>
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                ))
+              : null}
+
+            {hasQuery ? (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading="Ask">
+                  <CommandItem value="ask-ai" onSelect={() => setAsk(query)} className="gap-3 rounded-lg px-2 py-2">
+                    <ItemIcon icon={SparklesIcon} />
+                    <span className="min-w-0 flex-1 truncate">Ask AI: "{query}"</span>
+                  </CommandItem>
+                </CommandGroup>
+              </>
+            ) : null}
+
+            {isOwner ? (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading={hasQuery ? "Create" : "Quick actions"}>
+                  <CommandItem value="create-page" onSelect={() => quickCreate("PAGE")} className="gap-3 rounded-lg px-2 py-2">
+                    <ItemIcon icon={FilePlusIcon} />
+                    <span>
+                      {hasQuery ? `Create page "${query}"` : "New page"}
+                      {!hasQuery && currentSection ? (
+                        <span className="ml-1 text-xs text-muted-foreground">in {resolveSectionLabel(currentSection)}</span>
+                      ) : null}
+                    </span>
+                  </CommandItem>
+                  <CommandItem value="create-space" onSelect={() => quickCreate("SPACE")} className="gap-3 rounded-lg px-2 py-2">
+                    <ItemIcon icon={FolderPlusIcon} />
+                    <span>{hasQuery ? `Create space "${query}"` : "New space"}</span>
+                  </CommandItem>
+                </CommandGroup>
+              </>
+            ) : null}
+
+            {navItems.length > 0 ? (
+              <>
+                <CommandSeparator />
+                <CommandGroup heading="Go to">
+                  {navItems.map((item) => {
+                    const active = pathname.startsWith(item.href);
+                    return (
+                      <CommandItem
+                        key={item.href}
+                        value={`nav-${item.href}`}
+                        onSelect={() => run(() => router.push(item.href))}
+                        className="gap-3 rounded-lg px-2 py-2"
+                      >
+                        <ItemIcon icon={item.icon} />
+                        <span className="flex-1">{item.label}</span>
+                        {active ? <span className="text-xs text-muted-foreground">current</span> : null}
+                      </CommandItem>
+                    );
+                  })}
+                  {!hasQuery || "toggle sidebar".includes(query.toLowerCase()) ? (
+                    <CommandItem value="toggle-sidebar" onSelect={() => run(toggleSidebar)} className="gap-3 rounded-lg px-2 py-2">
+                      <ItemIcon icon={PanelLeftIcon} />
+                      <span>Toggle sidebar</span>
+                    </CommandItem>
+                  ) : null}
+                </CommandGroup>
+              </>
+            ) : null}
+          </CommandList>
+
+          <div className="flex items-center justify-between gap-2 border-t px-3 py-2 text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1">
+                <Kbd>↑</Kbd>
+                <Kbd>↓</Kbd>
+                <span className="mx-0.5">or</span>
+                <Kbd>Tab</Kbd>
+                navigate
+              </span>
+              <span className="flex items-center gap-1">
+                <Kbd>↵</Kbd>
+                open
+              </span>
+            </div>
             <span className="flex items-center gap-1">
-              <Kbd>↑</Kbd>
-              <Kbd>↓</Kbd>
-              <span className="mx-0.5">or</span>
-              <Kbd>Tab</Kbd>
-              navigate
-            </span>
-            <span className="flex items-center gap-1">
-              <Kbd>↵</Kbd>
-              open
+              <Kbd>esc</Kbd>
+              close
             </span>
           </div>
-          <span className="flex items-center gap-1">
-            <Kbd>esc</Kbd>
-            close
-          </span>
-        </div>
-      </Command>
+        </Command>
       )}
     </CommandDialog>
   );

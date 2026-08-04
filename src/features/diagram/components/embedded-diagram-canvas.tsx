@@ -7,9 +7,7 @@ import { type ComponentProps, useEffect, useMemo, useState } from "react";
 
 // The imperative API handle Excalidraw hands back, derived from the prop so we
 // don't depend on a deep type import path (same trick as the draw canvas).
-type ExcalidrawApi = Parameters<
-  NonNullable<ComponentProps<typeof Excalidraw>["excalidrawAPI"]>
->[0];
+type ExcalidrawApi = Parameters<NonNullable<ComponentProps<typeof Excalidraw>["excalidrawAPI"]>>[0];
 
 type BinaryFiles = ReturnType<ExcalidrawApi["getFiles"]>;
 
@@ -71,19 +69,11 @@ export default function EmbeddedDiagramCanvas({
     onReady({
       getScene: () => ({
         // Drop tombstoned elements so a save doesn't grow the stored scene.
-        elements: api
-          .getSceneElements()
-          .filter((element) => !element.isDeleted),
+        elements: api.getSceneElements().filter((element) => !element.isDeleted),
         files: api.getFiles(),
       }),
     });
   }, [api, onReady]);
 
-  return (
-    <Excalidraw
-      excalidrawAPI={setApi}
-      initialData={initialData}
-      theme={resolvedTheme === "dark" ? "dark" : "light"}
-    />
-  );
+  return <Excalidraw excalidrawAPI={setApi} initialData={initialData} theme={resolvedTheme === "dark" ? "dark" : "light"} />;
 }
