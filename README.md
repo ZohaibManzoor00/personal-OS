@@ -1,4 +1,4 @@
-# My Personal OS
+# A Personal OS
 An operating system built to capture, organize, and grow everything I learn.
 
 ## Overview
