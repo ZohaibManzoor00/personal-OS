@@ -15,5 +15,3 @@ This is my long-term knowledge hub for engineering, career growth, projects, and
 - Tailwind CSS
 - shadcn/ui
 
-## Vision
-The goal is to become a system that understands everything I've learned, built, and accomplished—unlocking intelligent workflows for learning, career growth, and productivity.
