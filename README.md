@@ -1,14 +1,6 @@
 # Personal OS
-<<<<<<< Updated upstream
 An operating system built to capture, organize, and grow everything I learn.
-=======
 
-A personal knowledge base that doubles as a public, AI-queryable showcase. I write; anyone can browse, search, or ask an AI agent about my notes — while private sections stay owner-only.
->>>>>>> Stashed changes
-
-## Overview
-
-<<<<<<< Updated upstream
 ## Tech Stack
 - Next.js(React)
 - TypeScript
@@ -20,7 +12,6 @@ A personal knowledge base that doubles as a public, AI-queryable showcase. I wri
 - Tailwind CSS
 - shadcn/ui
 
-=======
 Instead of scattered docs, everything I learn and build lives in one connected system: engineering, career, projects, and AI workflows, organized as searchable note trees. The whole app runs as a read-only showcase of my content until I sign in, so visitors can explore or interrogate it, but only I can edit.
 
 ## What it does
